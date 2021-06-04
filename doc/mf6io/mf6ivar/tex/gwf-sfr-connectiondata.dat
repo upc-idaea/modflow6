@@ -1,5 +1,0 @@
-BEGIN CONNECTIONDATA
-  <rno> [<ic(ncon(rno))>]
-  <rno> [<ic(ncon(rno))>]
-  ...
-END CONNECTIONDATA
