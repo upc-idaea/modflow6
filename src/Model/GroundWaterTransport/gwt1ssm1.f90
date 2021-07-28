@@ -1,7 +1,7 @@
 ! -- todo: need observations for SSM terms
-  
+
 module GwtSsmModule
-  
+
   use KindModule,             only: DP, I4B
   use ConstantsModule,        only: DONE, DZERO, LENAUXNAME, LENFTYPE,         &
                                     LENPACKAGENAME, LINELENGTH,                &
@@ -10,7 +10,7 @@ module GwtSsmModule
   use BaseDisModule,          only: DisBaseType
   use GwtFmiModule,           only: GwtFmiType
   use TableModule,            only: TableType, table_cr
-  
+
   implicit none
   public :: GwtSsmType
   public :: ssm_cr
@@ -19,7 +19,7 @@ module GwtSsmModule
   character(len=LENPACKAGENAME) :: text  = ' SOURCE-SINK MIX'
 
   type, extends(NumericalPackageType) :: GwtSsmType
-    
+
     integer(I4B), pointer                              :: nbound                ! number of flow boundaries in this time step
     integer(I4B), dimension(:), pointer, contiguous    :: iauxpak => null()     ! aux col for concentration
     integer(I4B), dimension(:), pointer, contiguous    :: ibound => null()      ! pointer to model ibound
@@ -28,9 +28,9 @@ module GwtSsmModule
     !
     ! -- table objects
     type(TableType), pointer :: outputtab => null()
-    
+
   contains
-  
+
     procedure :: ssm_df
     procedure :: ssm_ar
     procedure :: ssm_ad
@@ -46,11 +46,11 @@ module GwtSsmModule
     procedure, private :: read_options
     procedure, private :: read_data
     procedure, private :: pak_setup_outputtab
-  
+
   end type GwtSsmType
-  
+
   contains
-  
+
   subroutine ssm_cr(ssmobj, name_model, inunit, iout, fmi)
 ! ******************************************************************************
 ! ssm_cr -- Create a new SSM object
@@ -181,14 +181,14 @@ module GwtSsmModule
     ! -- Calculate total number of flow boundaries
     this%nbound = 0
     do ip = 1, this%fmi%nflowpack
-      if (this%fmi%iatp(ip) /= 0) cycle 
+      if (this%fmi%iatp(ip) /= 0) cycle
       this%nbound = this%nbound + this%fmi%gwfpackages(ip)%nbound
     end do
     !
     ! -- Return
     return
   end subroutine ssm_ad
-  
+
   subroutine ssm_term(this, ipackage, ientry, rrate, rhsval, hcofval)
 ! ******************************************************************************
 ! ssm_term
@@ -227,11 +227,11 @@ module GwtSsmModule
       iauxpos = this%iauxpak(ipackage)
       !
       ! -- assign values for hcoftmp, rhstmp, and ctmp for subsequent assigment
-      !    of hcof, rhs, and rate    
+      !    of hcof, rhs, and rate
       if(iauxpos >= 0) then
         !
         ! -- concentration is zero or stored in auxiliary variable; if
-        !    qbnd is positive, then concentration represents the inflow 
+        !    qbnd is positive, then concentration represents the inflow
         !    concentration.  If qbnd is negative, then the outflow concentration
         !    is set equal to the simulated cell concentration
         if (qbnd >= DZERO) then
@@ -265,11 +265,13 @@ module GwtSsmModule
         end if
       endif
       !
-      ! -- Add terms based on qbnd sign
-      if(qbnd <= DZERO) then
-        hcoftmp = qbnd * omega
-      else
-        rhstmp = -qbnd * ctmp * (DONE - omega)
+      ! -- Non conservative (advective) formulation considers
+      !
+      !      Equation => qs*(cs-c) if qs>0
+      !
+      if(qbnd > DZERO) then
+        hcoftmp = -qbnd
+        rhstmp  = -qbnd * ctmp
       endif
       !
       ! -- end of active ibound
@@ -283,7 +285,7 @@ module GwtSsmModule
     ! -- return
     return
   end subroutine ssm_term
-  
+
   subroutine ssm_fc(this, amatsln, idxglo, rhs)
 ! ******************************************************************************
 ! ssm_fc -- Calculate coefficients and fill amat and rhs
@@ -329,7 +331,7 @@ module GwtSsmModule
     ! -- Return
     return
   end subroutine ssm_fc
-  
+
   subroutine ssm_cq(this, flowja)
 ! ******************************************************************************
 ! ssm_bdcalc -- Calculate budget terms
@@ -760,7 +762,7 @@ module GwtSsmModule
     ! -- local
     integer(I4B) :: nflowpack
 ! ------------------------------------------------------------------------------
-    !    
+    !
     ! -- Allocate
     nflowpack = this%fmi%nflowpack
     call mem_allocate(this%iauxpak, nflowpack, 'IAUXPAK',                      &
@@ -772,7 +774,7 @@ module GwtSsmModule
     ! -- Return
     return
   end subroutine allocate_arrays
-  
+
   subroutine read_options(this)
 ! ******************************************************************************
 ! read_options -- Allocate and Read
@@ -948,7 +950,7 @@ module GwtSsmModule
     ! -- Return
     return
   end subroutine read_data
-  
+
   subroutine pak_setup_outputtab(this)
 ! ******************************************************************************
 ! bnd_options -- set options for a class derived from BndType
