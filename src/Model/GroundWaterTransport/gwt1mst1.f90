@@ -1,6 +1,6 @@
 !> -- @ brief Mobile Storage and Transfer (MST) Module
 !!
-!!    The GwtMstModule is contains the GwtMstType, which is the 
+!!    The GwtMstModule is contains the GwtMstType, which is the
 !!    derived type responsible for adding the effects of
 !!      1. Changes in dissolved solute mass
 !!      2. Decay of dissolved solute mass
@@ -8,7 +8,7 @@
 !!      4. Decay of sorbed solute mass
 !<
 module GwtMstModule
-  
+
   use KindModule,             only: DP, I4B
   use ConstantsModule,        only: DONE, DZERO, DTWO, DHALF, LENBUDTXT
   use SimVariablesModule,     only: errmsg, warnmsg
@@ -17,7 +17,7 @@ module GwtMstModule
   use NumericalPackageModule, only: NumericalPackageType
   use BaseDisModule,          only: DisBaseType
   use GwtFmiModule,           only: GwtFmiType
-  
+
   implicit none
   public :: GwtMstType
   public :: mst_cr
@@ -61,7 +61,7 @@ module GwtMstModule
     type(GwtFmiType), pointer                        :: fmi => null()           !< pointer to fmi object
 
   contains
-  
+
     procedure :: mst_ar
     procedure :: mst_fc
     procedure :: mst_fc_sto
@@ -83,11 +83,11 @@ module GwtMstModule
     procedure, private :: allocate_arrays
     procedure, private :: read_options
     procedure, private :: read_data
-  
+
   end type GwtMstType
-  
+
   contains
-  
+
   !> @ brief Create a new package object
   !!
   !!  Create a new MST object
@@ -158,7 +158,7 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_ar
-  
+
   !> @ brief Fill coefficient method for package
   !!
   !!  Method to calculate and fill coefficients for the package.
@@ -203,7 +203,7 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_fc
-  
+
   !> @ brief Fill storage coefficient method for package
   !!
   !!  Method to calculate and fill storage coefficients for the package.
@@ -226,6 +226,7 @@ module GwtMstModule
     real(DP) :: tled
     real(DP) :: hhcof, rrhs
     real(DP) :: vnew, vold
+    real(DP) :: v, alp
     !
     ! -- set variables
     tled = DONE / delt
@@ -243,9 +244,18 @@ module GwtMstModule
       if (this%fmi%igwfstrgss /= 0) vold = vold + this%fmi%gwfstrgss(n) * delt
       if (this%fmi%igwfstrgsy /= 0) vold = vold + this%fmi%gwfstrgsy(n) * delt
       !
+      !
+      ! -- Non conservative (advective) formulation considers
+      !
+      !      Equation => V*dc/dt = V^alp/dt*( c^(t+dt)-c^t) with alp = [0,1]
+      !
+      ! -- Our V
+      alp = 0.0 ! alp = 0 => t, alp = 1 => t+dt
+      v   = alp*vnew + (1-alp)*vold
+      !
       ! -- add terms to diagonal and rhs accumulators
-      hhcof = -vnew * tled
-      rrhs = -vold * tled * cold(n)
+      hhcof = -v * tled
+      rrhs  = -v * tled * cold(n)
       idiag = this%dis%con%ia(n)
       amatsln(idxglo(idiag)) = amatsln(idxglo(idiag)) + hhcof
       rhs(n) = rhs(n) + rrhs
@@ -254,7 +264,7 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_fc_sto
-  
+
   !> @ brief Fill decay coefficient method for package
   !!
   !!  Method to calculate and fill decay coefficients for the package.
@@ -368,7 +378,7 @@ module GwtMstModule
       rhob = this%bulk_density(n)
       call mst_srb_term(this%isrb, thetamfrac, rhob, vcell, tled, cnew(n),     &
                         cold(n), swtpdt, swt, const1, const2,                  &
-                        hcofval=hhcof, rhsval=rrhs) 
+                        hcofval=hhcof, rhsval=rrhs)
       !
       ! -- Add hhcof to diagonal and rrhs to right-hand side
       amatsln(idxglo(idiag)) = amatsln(idxglo(idiag)) + hhcof
@@ -379,14 +389,14 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_fc_srb
-  
+
   !> @ brief Calculate sorption terms
   !!
   !!  Subroutine to calculate sorption terms
   !!
   !<
   subroutine mst_srb_term(isrb, thetamfrac, rhob, vcell, tled, cnew, cold,     &
-                          swnew, swold, const1, const2, rate, hcofval, rhsval) 
+                          swnew, swold, const1, const2, rate, hcofval, rhsval)
     ! -- modules
     ! -- dummy
     integer(I4B), intent(in) :: isrb                  !< sorption flag 1, 2, 3 are linear, freundlich, and langmuir
@@ -402,7 +412,7 @@ module GwtMstModule
     real(DP), intent(in) :: const2                    !< zero, freundlich exponent, or langmuir sorption sites
     real(DP), intent(out), optional :: rate           !< calculated sorption rate
     real(DP), intent(out), optional :: hcofval        !< diagonal contribution to solution coefficient matrix
-    real(DP), intent(out), optional :: rhsval         !< contribution to solution right-hand-side 
+    real(DP), intent(out), optional :: rhsval         !< contribution to solution right-hand-side
     ! -- local
     real(DP) :: term
     real(DP) :: derv
@@ -422,7 +432,7 @@ module GwtMstModule
     else
       !
       ! -- calculate average aqueous concentration
-      cavg = DHALF * (cold + cnew) 
+      cavg = DHALF * (cold + cnew)
       !
       ! -- set values based on isotherm
       if (isrb == 2) then
@@ -529,7 +539,7 @@ module GwtMstModule
         ! -- Call function to get zero-order decay rate, which may be changed
         !    from the user-specified rate to prevent negative concentrations
         if (distcoef > DZERO) then
-          
+
           if (this%isrb == 1) then
             csrbold = cold(n) * distcoef
             csrbnew = cnew(n) * distcoef
@@ -540,14 +550,14 @@ module GwtMstModule
             csrbold = get_langmuir_conc(cold(n), distcoef, this%sp2(n))
             csrbnew = get_langmuir_conc(cnew(n), distcoef, this%sp2(n))
           end if
-          
+
           decay_rate = get_zero_order_decay(this%decay_sorbed(n),              &
                                             this%decayslast(n),                &
                                             kiter, csrbold, csrbnew, delt)
           this%decayslast(n) = decay_rate
           rrhs = decay_rate * thetamfrac * this%bulk_density(n) * swnew * vcell
         end if
-        
+
       endif
       !
       ! -- Add hhcof to diagonal and rrhs to right-hand side
@@ -559,7 +569,7 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_fc_dcy_srb
-  
+
   !> @ brief Calculate flows for package
   !!
   !!  Method to calculate flows for the package.
@@ -619,7 +629,7 @@ module GwtMstModule
     real(DP) :: vnew, vold
     real(DP) :: hhcof, rrhs
     !
-    ! -- initialize 
+    ! -- initialize
     tled = DONE / delt
     !
     ! -- Calculate storage change
@@ -672,7 +682,7 @@ module GwtMstModule
     real(DP) :: vcell
     real(DP) :: decay_rate
     !
-    ! -- initialize 
+    ! -- initialize
     !
     ! -- Calculate decay change
     do n = 1, nodes
@@ -733,7 +743,7 @@ module GwtMstModule
     real(DP) :: const2
     real(DP) :: thetamfrac
     !
-    ! -- initialize 
+    ! -- initialize
     tled = DONE / delt
     !
     ! -- Calculate sorption change
@@ -756,7 +766,7 @@ module GwtMstModule
       if (this%isrb > 1) const2 = this%sp2(n)
       call mst_srb_term(this%isrb, thetamfrac, rhob, vcell, tled, cnew(n),     &
                         cold(n), swtpdt, swt, const1, const2,                  &
-                        rate=rate) 
+                        rate=rate)
       this%ratesrb(n) = rate
       idiag = this%dis%con%ia(n)
       flowja(idiag) = flowja(idiag) + rate
@@ -854,7 +864,7 @@ module GwtMstModule
                                             this%decayslast(n),                &
                                             0, csrbold, csrbnew, delt)
           rrhs = decay_rate * thetamfrac * this%bulk_density(n) * swnew * vcell
-        end if      
+        end if
       endif
       !
       ! -- calculate rate
@@ -915,7 +925,7 @@ module GwtMstModule
     ! -- Return
     return
   end subroutine mst_bd
-  
+
   !> @ brief Output flow terms for package
   !!
   !!  Method to output terms for the package.
@@ -1406,7 +1416,7 @@ module GwtMstModule
 
   !> @ brief Add porosity values to prsity2
   !!
-  !!  Method to add immobile domain porosities, which are stored as a 
+  !!  Method to add immobile domain porosities, which are stored as a
   !!  cumulative value in prsity2.
   !!
   !<
@@ -1447,7 +1457,7 @@ module GwtMstModule
     ! -- Return
     return
   end function get_thetamfrac
-  
+
   !> @ brief Return immobile porosity fraction
   !!
   !!  Pass in an immobile domain porosity and calculate the fraction
@@ -1469,7 +1479,7 @@ module GwtMstModule
     ! -- Return
     return
   end function get_thetaimfrac
-  
+
   !> @ brief Calculate sorption concentration using Freundlich
   !!
   !!  Function to calculate sorption concentration using Freundlich
@@ -1489,8 +1499,8 @@ module GwtMstModule
       cbar = DZERO
     end if
     return
-  end function 
-  
+  end function
+
   !> @ brief Calculate sorption concentration using Langmuir
   !!
   !!  Function to calculate sorption concentration using Langmuir
@@ -1510,8 +1520,8 @@ module GwtMstModule
       cbar = DZERO
     end if
     return
-  end function 
-  
+  end function
+
   !> @ brief Calculate sorption derivative using Freundlich
   !!
   !!  Function to calculate sorption derivative using Freundlich
@@ -1531,8 +1541,8 @@ module GwtMstModule
       derv = DZERO
     end if
     return
-  end function 
-  
+  end function
+
   !> @ brief Calculate sorption derivative using Langmuir
   !!
   !!  Function to calculate sorption derivative using Langmuir
@@ -1552,8 +1562,8 @@ module GwtMstModule
       derv = DZERO
     end if
     return
-  end function 
-  
+  end function
+
   !> @ brief Calculate zero-order decay rate and constrain if necessary
   !!
   !!  Function to calculate the zero-order decay rate from the user specified
@@ -1599,6 +1609,6 @@ module GwtMstModule
     end if
     return
   end function get_zero_order_decay
-  
-   
+
+
 end module GwtMstModule
