@@ -1,5 +1,5 @@
 module GwtAdvModule
-  
+
   use KindModule,             only: DP, I4B
   use ConstantsModule,        only: DONE, DZERO, DHALF, DTWO
   use NumericalPackageModule, only: NumericalPackageType
@@ -12,27 +12,27 @@ module GwtAdvModule
   public :: adv_cr
 
   type, extends(NumericalPackageType) :: GwtAdvType
-    
+
     integer(I4B), pointer                            :: iadvwt => null()        ! advection scheme (0 up, 1 central, 2 tvd)
     integer(I4B), dimension(:), pointer, contiguous  :: ibound => null()        ! pointer to model ibound
     type(GwtFmiType), pointer                        :: fmi => null()           ! pointer to fmi object
-    
+
   contains
-  
+
     procedure :: adv_ar
     procedure :: adv_fc
     procedure :: adv_cq
     procedure :: adv_da
-    
+
     procedure :: allocate_scalars
     procedure, private :: read_options
     procedure, private :: advqtvd
     procedure, private :: advtvd_bd
     procedure :: adv_weight
     procedure :: advtvd
-    
+
   end type GwtAdvType
-  
+
   contains
 
   subroutine adv_cr(advobj, name_model, inunit, iout, fmi)
@@ -124,11 +124,17 @@ module GwtAdvModule
     real(DP), dimension(:), intent(inout) :: rhs
     ! -- local
     integer(I4B) :: n, m, idiag, ipos
-    real(DP) :: omega, qnm
-! ------------------------------------------------------------------------------
-    !
-    ! -- Calculate advection terms and add to solution rhs and hcof.  qnm 
+    real(DP) :: omega, qnm, qn
+    ! ------------------------------------------------------------------------------
+    ! -- Calculate advection terms and add to solution rhs and hcof.  qnm
     !    is the volumetric flow rate and has dimensions of L^/T.
+    !
+    ! -- Non conservative (advective) formulation considers our particular formulation
+    !
+    !      Mesh => | m | n | o |
+    !
+    !      Equation => q*grad(c) = qmn*(cn-cm)*(1-omega) + qmo*(co-cm)*(1-omega)
+    !
     do n = 1, nodes
       if (this%ibound(n) == 0) cycle
       idiag = this%dis%con%ia(n)
@@ -137,8 +143,8 @@ module GwtAdvModule
         if (this%ibound(m) == 0) cycle
         qnm = this%fmi%gwfflowja(ipos)
         omega = this%adv_weight(this%iadvwt, ipos, n, m, qnm)
-        amatsln(idxglo(ipos)) = amatsln(idxglo(ipos)) + qnm * (DONE - omega)
-        amatsln(idxglo(idiag)) = amatsln(idxglo(idiag)) + qnm * omega
+        amatsln(idxglo(ipos)) = amatsln(idxglo(ipos)) + qnm * ( DONE - omega)
+        amatsln(idxglo(idiag)) = amatsln(idxglo(idiag)) + qnm * (-DONE + omega)
       enddo
     enddo
     !
@@ -153,7 +159,7 @@ module GwtAdvModule
     ! -- Return
     return
   end subroutine adv_fc
-    
+
   subroutine advtvd(this, n, cnew, rhs)
 ! ******************************************************************************
 ! advtvd -- Calculate TVD
@@ -162,7 +168,7 @@ module GwtAdvModule
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    ! -- dummy  
+    ! -- dummy
     class(GwtAdvType) :: this
     integer(I4B), intent(in) :: n
     real(DP), dimension(:), intent(in) :: cnew
@@ -197,7 +203,7 @@ module GwtAdvModule
     use ConstantsModule, only: DPREC
     ! -- return
     real(DP) :: qtvd
-    ! -- dummy  
+    ! -- dummy
     class(GwtAdvType) :: this
     integer(I4B), intent(in) :: n
     integer(I4B), intent(in) :: m
@@ -298,7 +304,7 @@ module GwtAdvModule
     ! -- Return
     return
   end subroutine adv_cq
-  
+
   subroutine advtvd_bd(this, cnew, flowja)
 ! ******************************************************************************
 ! advtvd_bd -- Add TVD contribution to flowja
@@ -307,7 +313,7 @@ module GwtAdvModule
 !    SPECIFICATIONS:
 ! ------------------------------------------------------------------------------
     ! -- modules
-    ! -- dummy  
+    ! -- dummy
     class(GwtAdvType) :: this
     real(DP), dimension(:), intent(in) :: cnew
     real(DP), dimension(:), intent(inout) :: flowja
@@ -511,7 +517,7 @@ module GwtAdvModule
     ! -- return
     return
   end function adv_weight
-  
 
-  
+
+
 end module GwtAdvModule
