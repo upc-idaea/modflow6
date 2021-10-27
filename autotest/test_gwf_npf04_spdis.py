@@ -9,6 +9,7 @@ the parent grid.  The heads are also compared.
 """
 
 import os
+import pytest
 import sys
 import numpy as np
 
@@ -33,7 +34,7 @@ namea = "a"
 nameb = "b"
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
 
     # grid properties
     nlay = 3
@@ -163,14 +164,7 @@ def get_model(idx, dir):
         exchangedata=exchangedata,
     )
 
-    return sim
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim = get_model(idx, dir)
-        sim.write_simulation()
-    return
+    return sim, None
 
 
 def qxqyqz(fname, nlay, nrow, ncol):
@@ -216,10 +210,10 @@ def eval_mf6(sim):
     qxb, qyb, qzb = qxqyqz(fname, nlayb, nrowb, ncolb)
     msg = "qx should be the same {} {}".format(qxa[0, 2, 1], qxb[0, 0, 0])
     assert np.allclose(qxa[0, 2, 1], qxb[0, 0, 0]), msg
-    
+
     cbcpth = os.path.join(sim.simpath, "{}.cbc".format(namea))
     grdpth = os.path.join(sim.simpath, "{}.dis.grb".format(namea))
-    grb = flopy.utils.MfGrdFile(grdpth)
+    grb = flopy.mf6.utils.MfGrdFile(grdpth)
     cbb = flopy.utils.CellBudgetFile(cbcpth, precision="double")
     flow_ja_face = cbb.get_data(text="FLOW-JA-FACE")
     ia = grb._datadict["IA"] - 1
@@ -235,18 +229,19 @@ def eval_mf6(sim):
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_mf6, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_mf6, idxsim=idx))
 
 
 def main():
@@ -254,10 +249,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_mf6, idxsim=idx)
         test.run_mf6(sim)
 

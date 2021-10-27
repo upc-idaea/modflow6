@@ -1,4 +1,5 @@
 import os
+import pytest
 
 try:
     import pymake
@@ -100,7 +101,7 @@ ldnd = [0]
 dp = [[kv, cr, cc]]
 
 
-def build_model(idx, ws):
+def get_model(idx, ws):
     name = ex[idx]
     ss = 1.14e-3
     sc6 = True
@@ -225,26 +226,23 @@ def build_model(idx, ws):
     return sim
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     ws = dir
-    sim = build_model(idx, ws)
+    sim = get_model(idx, ws)
 
     ws = os.path.join(dir, cmppth)
-    mc = build_model(idx, ws)
+    mc = get_model(idx, ws)
     return sim, mc
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_simulation()
-    return
 
 
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
 
@@ -252,29 +250,22 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        if is_CI and not continuous_integration[idx]:
-            continue
-        yield test.run_mf6, Simulation(
-            dir,
-            mf6_regression=True,
-        )
+    if is_CI and not continuous_integration[idx]:
+        return
 
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, mf6_regression=True))
 
 
 def main():
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for dir in exdirs:
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(
             dir,
             mf6_regression=True,

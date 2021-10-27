@@ -18,6 +18,7 @@ module EvtModule
   !
   character(len=LENFTYPE)       :: ftype = 'EVT'
   character(len=LENPACKAGENAME) :: text  = '             EVT'
+  character(len=LENPACKAGENAME) :: texta  = '           EVTA'
   !
   type, extends(BndType) :: EvtType
     ! -- logicals
@@ -192,6 +193,7 @@ module EvtModule
     case ('READASARRAYS')
       if (this%dis%supports_layers()) then
         this%read_as_arrays = .true.
+        this%text = texta
       else
         ermsg = 'READASARRAYS option is not compatible with selected' // &
                 ' discretization type.'
@@ -397,6 +399,7 @@ module EvtModule
           this%ionper = nper + 1
         else
           ! -- Found invalid block
+          call this%parser%GetCurrentLine(line)
           write(errmsg, fmtblkerr) adjustl(trim(line))
           call store_error(errmsg)
           call this%parser%StoreErrorUnit()
@@ -455,7 +458,9 @@ module EvtModule
     if (inrate == 1) then
       do n = 1, this%nbound
         node = this%nodelist(n)
-        this%bound(2, n) = this%bound(2, n) * this%dis%get_area(node)
+        if (node > 0) then
+          this%bound(2, n) = this%bound(2, n) * this%dis%get_area(node)
+        end if
       enddo
     endif
     !
@@ -520,6 +525,17 @@ module EvtModule
         node = this%nodelist(i)
       else
         node = this%nodesontop(i)
+      end if
+      !
+      ! -- cycle if nonexistent bound
+      if (node <= 0) then
+        this%hcof(i) = DZERO
+        this%rhs(i) = DZERO
+        cycle
+      end if
+      !
+      ! -- reset nodelist to highest active
+      if (.not. this%fixed_cell) then
         if (this%ibound(node) == 0) &
           call this%dis%highest_active(node, this%ibound)
         this%nodelist(i) = node
@@ -643,6 +659,7 @@ module EvtModule
     ! -- Copy package rhs and hcof into solution rhs and amat
     do i = 1, this%nbound
       n = this%nodelist(i)
+      if (n <= 0) cycle
       ! -- reset hcof and rhs for excluded cells
       if (this%ibound(n) == 10000) then
         this%hcof(i) = DZERO
@@ -1106,10 +1123,8 @@ module EvtModule
       do ic = 1, ncol
         nodeu = get_node(il, ir, ic, nlay, nrow, ncol)
         noder = this%dis%get_nodenumber(nodeu, 0)
-        if(noder > 0) then
-          this%nodelist(ipos) = noder
-          ipos = ipos + 1
-        endif
+        this%nodelist(ipos) = noder
+        ipos = ipos + 1
       enddo
     enddo
     !

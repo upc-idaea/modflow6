@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 
 try:
@@ -153,7 +154,7 @@ ds15 = [0, 0, 0, 2052, 0, 0, 0, 0, 0, 0, 0, 0]
 ds16 = [0, nper - 1, 0, nstp[-1] - 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1]
 
 # Build MODFLOW 6 files
-def build_model(idx, ws):
+def get_model(idx, ws):
     name = ex[idx]
     newton = newtons[idx]
     newtonoptions = None
@@ -345,12 +346,12 @@ def build_model(idx, ws):
 
 
 # SUB package problem 3
-def get_model(idx, dir):
+def build_model(idx, dir):
     ws = dir
-    sim = build_model(idx, ws)
+    sim = get_model(idx, ws)
 
     ws = os.path.join(dir, cmppths[idx])
-    mc = build_model(idx, ws)
+    mc = get_model(idx, ws)
 
     return sim, mc
 
@@ -480,16 +481,13 @@ def eval_comp(sim):
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_simulation()
-    return
 
 
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
     r_exe = None
@@ -501,30 +499,27 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(
+    # run the test model
+    test.run_mf6(
+        Simulation(
             dir,
             exfunc=eval_comp,
             htol=htol[idx],
             idxsim=idx,
             mf6_regression=True,
         )
-
-    return
+    )
 
 
 def main():
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(
             dir,
             exfunc=eval_comp,

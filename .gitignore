@@ -59,11 +59,7 @@ doc/UserGuide/*.pdf
 doc/ConverterGuide/*.pdf
 doc/zonebudget/*.pdf
 
-bin/mf6
-bin/libmf6.*
-bin/mf5to6
-bin/zbud6
-bin/*.txt
+bin/**
 
 UserPrefs.xml
 
@@ -96,11 +92,11 @@ Thumbs.db
 
 *.blg
 
-*.bat
 
 msvs/My Advisor Results*
 
 build/
+lib/
 CMakeFiles/
 
 # ReadTheDocs
@@ -116,6 +112,7 @@ latex/
 html/
 xml/
 distribution/run-time-comparison.md
+doc/ReleaseNotes/run-time-comparison.tex
 
 # Intel Fortran Visual Studio intermediate files
 msvs/*.fdz
@@ -123,3 +120,4 @@ msvs/*.fdz
 # Visual Studio Code
 modflow6.code-workspace
 .vscode/settings.json
+.vscode/launch.json

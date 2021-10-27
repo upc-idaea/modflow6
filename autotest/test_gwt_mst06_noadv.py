@@ -6,6 +6,7 @@ with a decay rate of 1.  And a starting concentration of 8.  Result should be
 
 """
 import os
+import pytest
 import numpy as np
 
 try:
@@ -36,7 +37,7 @@ for s in ex:
 ddir = "data"
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     nlay, nrow, ncol = 1, 1, 1
     nper = 1
     perlen = [10.0]
@@ -138,14 +139,7 @@ def get_model(idx, dir):
         printrecord=[("CONCENTRATION", "ALL"), ("BUDGET", "ALL")],
     )
     print(gwt.modelgrid.zcellcenters)
-    return sim
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim = get_model(idx, dir)
-        sim.write_simulation()
-    return
+    return sim, None
 
 
 def eval_transport(sim):
@@ -164,8 +158,8 @@ def eval_transport(sim):
         assert False, 'could not load data from "{}"'.format(fpth)
 
     # The answer
-    #print(conc[:, 1])
-    cres = np.array([7., 6., 5., 4., 3., 2., 1., 0., 0., 0.])
+    # print(conc[:, 1])
+    cres = np.array([7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0, 0.0, 0.0, 0.0])
     msg = (
         "simulated concentrations do not match with known "
         "solution. {} {}".format(conc[:, 1], cres)
@@ -178,32 +172,43 @@ def eval_transport(sim):
         bobj = flopy.utils.CellBudgetFile(fpth, precision="double")
     except:
         assert False, 'could not load data from "{}"'.format(fpth)
-    decay_list = bobj.get_data(text='DECAY-AQUEOUS')
+    decay_list = bobj.get_data(text="DECAY-AQUEOUS")
     decay_rate = [dr[0] for dr in decay_list]
-    decay_rate_answer = [-8.4, -8.4, -8.4, -8.4, -8.4, -8.4, -8.4, -8.4, 0.0, 0.0]
+    decay_rate_answer = [
+        -8.4,
+        -8.4,
+        -8.4,
+        -8.4,
+        -8.4,
+        -8.4,
+        -8.4,
+        -8.4,
+        0.0,
+        0.0,
+    ]
     msg = (
         "simulated decay rates do not match with known "
         "solution. {} {}".format(decay_rate, decay_rate_answer)
     )
     assert np.allclose(decay_rate, decay_rate_answer), msg
 
-
     return
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_transport, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_transport, idxsim=idx))
 
 
 def main():
@@ -211,10 +216,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_transport, idxsim=idx)
         test.run_mf6(sim)
 

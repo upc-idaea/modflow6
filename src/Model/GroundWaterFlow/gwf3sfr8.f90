@@ -31,6 +31,10 @@ module SfrModule
   use SimModule, only: count_errors, store_error, store_error_unit,              &
                        store_warning
   use SimVariablesModule, only: errmsg, warnmsg
+  use GwfSfrCrossSectionUtilsModule, only: get_saturated_topwidth, &
+                                           get_wetted_topwidth, &
+                                           get_wetted_perimeter, &
+                                           get_cross_section_area
   !
   implicit none
   !
@@ -53,6 +57,7 @@ module SfrModule
     integer(I4B), pointer :: iprhed => null()                                     !< flag for printing stages to listing file
     integer(I4B), pointer :: istageout => null()                                  !< flag and unit number for binary stage output
     integer(I4B), pointer :: ibudgetout => null()                                 !< flag and unit number for binary sfr budget output
+    integer(I4B), pointer :: ibudcsv => null()                                    !< unit number for csv budget output file
     integer(I4B), pointer :: ipakcsv => null()                                    !< flag and unit number for package convergence information
     integer(I4B), pointer :: idiversions => null()                                !< flag indicating if there are any diversions
     integer(I4B), pointer :: nconn => NULL()                                      !< number of reach connections
@@ -84,7 +89,7 @@ module SfrModule
     type(TableType), pointer :: stagetab => null()                                !< reach stage table written to the listing file
     type(TableType), pointer :: pakcsvtab => null()                               !< SFR package convergence table
     !
-    ! -- moved from SfrDataType
+    ! -- sfr reach data
     integer(I4B), dimension(:), pointer, contiguous :: iboundpak => null()        !< ibound array for SFR reaches that defines active, inactive, and constant reaches
     integer(I4B), dimension(:), pointer, contiguous :: igwfnode => null()         !< groundwater node connected to SFR reaches
     integer(I4B), dimension(:), pointer, contiguous :: igwftopnode => null()      !< highest active groundwater node under SFR reaches
@@ -107,6 +112,12 @@ module SfrModule
     real(DP), dimension(:), pointer, contiguous :: simrunoff => null()            !< simulated reach runoff 
     real(DP), dimension(:), pointer, contiguous :: stage0 => null()               !< previous reach stage iterate
     real(DP), dimension(:), pointer, contiguous :: usflow0 => null()              !< previous upstream reach flow iterate
+    ! -- cross-section data
+    integer(I4B), pointer :: ncrossptstot => null()                               !< total number of cross-section points
+    integer(I4B), dimension(:), pointer, contiguous :: ncrosspts => null()        !< number of cross-section points for each reach
+    integer(I4B), dimension(:), pointer, contiguous :: iacross => null()          !< pointers to cross-section data for each reach
+    real(DP), dimension(:), pointer, contiguous :: station => null()              !< cross-section station (x-position) data
+    real(DP), dimension(:), pointer, contiguous :: xsdepths => null()               !< cross-section depth data
     ! -- connection data
     integer(I4B), dimension(:), pointer, contiguous :: idir => null()             !< reach connection direction
     integer(I4B), dimension(:), pointer, contiguous :: idiv => null()             !< reach connection diversion number
@@ -167,17 +178,19 @@ module SfrModule
       procedure, private :: sfr_calc_qsource
       procedure, private :: sfr_calc_div
       ! -- geometry 
-      procedure, private :: area_wet
-      procedure, private :: perimeter_wet
-      procedure, private :: surface_area
-      procedure, private :: surface_area_wet
-      procedure, private :: top_width_wet
+      procedure, private :: calc_area_wet
+      procedure, private :: calc_perimeter_wet
+      procedure, private :: calc_surface_area
+      procedure, private :: calc_surface_area_wet
+      procedure, private :: calc_top_width_wet
       ! -- reading
       procedure, private :: sfr_read_packagedata
+      procedure, private :: sfr_read_crossection
       procedure, private :: sfr_read_connectiondata
       procedure, private :: sfr_read_diversions
       ! -- calculations
-      procedure, private :: sfr_rectch_depth
+      procedure, private :: sfr_calc_reach_depth
+      procedure, private :: sfr_calc_npoint_depth
       ! -- error checking
       procedure, private :: sfr_check_reaches
       procedure, private :: sfr_check_connections
@@ -261,6 +274,7 @@ module SfrModule
       call mem_allocate(this%iprhed, 'IPRHED', this%memoryPath)
       call mem_allocate(this%istageout, 'ISTAGEOUT', this%memoryPath)
       call mem_allocate(this%ibudgetout, 'IBUDGETOUT', this%memoryPath)
+      call mem_allocate(this%ibudcsv, 'IBUDCSV', this%memoryPath)
       call mem_allocate(this%ipakcsv, 'IPAKCSV', this%memoryPath)
       call mem_allocate(this%idiversions, 'IDIVERSIONS', this%memoryPath)
       call mem_allocate(this%maxsfrpicard, 'MAXSFRPICARD', this%memoryPath)
@@ -275,6 +289,7 @@ module SfrModule
       call mem_allocate(this%iconvchk, 'ICONVCHK', this%memoryPath)
       call mem_allocate(this%idense, 'IDENSE', this%memoryPath)
       call mem_allocate(this%ianynone, 'IANYNONE', this%memoryPath)
+      call mem_allocate(this%ncrossptstot, 'NCROSSPTSTOT', this%memoryPath)
       !
       ! -- set pointer to gwf iss
       call mem_setptr(this%gwfiss, 'ISS', create_mem_path(this%name_model))
@@ -283,6 +298,7 @@ module SfrModule
       this%iprhed = 0
       this%istageout = 0
       this%ibudgetout = 0
+      this%ibudcsv = 0
       this%ipakcsv = 0
       this%idiversions = 0
       this%maxsfrpicard = 100
@@ -297,6 +313,7 @@ module SfrModule
       this%iconvchk = 1
       this%idense = 0
       this%ianynone = 0
+      this%ncrossptstot = 0
       !
       ! -- return
       return
@@ -370,7 +387,14 @@ module SfrModule
       call mem_allocate(this%divflow, 0, 'DIVFLOW', this%memoryPath)
       call mem_allocate(this%divq, 0, 'DIVQ', this%memoryPath)
       !
+      ! -- cross-section data
+      call mem_allocate(this%ncrosspts, this%maxbound, 'NCROSSPTS', this%memoryPath)
+      call mem_allocate(this%iacross, this%maxbound+1, 'IACROSS', this%memoryPath)
+      call mem_allocate(this%station, this%ncrossptstot, 'STATION', this%memoryPath)
+      call mem_allocate(this%xsdepths, this%ncrossptstot, 'XSDEPTHS', this%memoryPath)
+      !
       ! -- initialize variables
+      this%iacross(1) = 0
       do i = 1, this%maxbound
         this%iboundpak(i) = 1
         this%igwfnode(i) = 0
@@ -407,6 +431,16 @@ module SfrModule
         do j = 1, this%naux
           this%rauxvar(j, i) = DZERO
         end do
+        !
+        ! -- cross-section data
+        this%ncrosspts(i) = 0
+        this%iacross(i+1) = 0
+      end do
+      !
+      ! -- initialize additional cross-section data
+      do i = 1, this%ncrossptstot
+        this%station(i) = DZERO
+        this%xsdepths(i) = DZERO
       end do
       !
       !-- fill csfrbudget
@@ -517,11 +551,17 @@ module SfrModule
       !    when PRINT_INPUT option is used.
       call this%define_listlabel()
       !
+      ! -- Define default cross-section data size
+      this%ncrossptstot = this%maxbound
+      !
       ! -- Allocate arrays in package superclass
       call this%sfr_allocate_arrays()
       !
       ! -- read package data
       call this%sfr_read_packagedata()
+      !
+      ! -- read cross-section data
+      call this%sfr_read_crossection()
       !
       ! -- read connection data
       call this%sfr_read_connectiondata()
@@ -567,7 +607,7 @@ module SfrModule
         "(4x, 'MAXIMUM DEPTH CHANGE VALUE (',g0,') SPECIFIED.')"
       character(len=*),parameter :: fmtsfrbin = &
         "(4x, 'SFR ', 1x, a, 1x, ' WILL BE SAVED TO FILE: ', a, /4x,               &
-      &'OPENED ON UNIT: ', I7)"
+      &'OPENED ON UNIT: ', I0)"
       !
       ! -- Check for SFR options
       select case (option)
@@ -600,6 +640,18 @@ module SfrModule
           else
             call store_error('Optional budget keyword must be ' //                 &
                             'followed by fileout.')
+          end if
+        case('BUDGETCSV')
+          call this%parser%GetStringCaps(keyword)
+          if (keyword == 'FILEOUT') then
+            call this%parser%GetString(fname)
+            this%ibudcsv = getunit()
+            call openfile(this%ibudcsv, this%iout, fname, 'CSV', &
+              filstat_opt='REPLACE')
+            write(this%iout,fmtsfrbin) 'BUDGET CSV', fname, this%ibudcsv
+          else
+            call store_error('OPTIONAL BUDGETCSV KEYWORD MUST BE FOLLOWED BY &
+              &FILEOUT')
           end if
         case('PACKAGE_CONVERGENCE')
           call this%parser%GetStringCaps(keyword)
@@ -752,6 +804,7 @@ module SfrModule
       integer(I4B) :: jj
       integer(I4B) :: iaux
       integer(I4B) :: nconzero
+      integer(I4B) :: ipos
       integer, allocatable, dimension(:) :: nboundchk
       real(DP), pointer :: bndElem => null()
       !
@@ -933,6 +986,17 @@ module SfrModule
         call this%parser%StoreErrorUnit()
       end if
       !
+      ! -- initialize the cross-section data
+      ipos = 1
+      this%iacross(1) = ipos
+      do i = 1, this%maxbound
+        this%ncrosspts(i) = 1
+        this%station(ipos) = this%width(i)
+        this%xsdepths(ipos) = DZERO
+        ipos = ipos + 1
+        this%iacross(i+1) = ipos 
+      end do
+      !
       ! -- deallocate local storage for aux variables
       if (this%naux > 0) then
         deallocate(caux)
@@ -941,6 +1005,140 @@ module SfrModule
       ! -- return
       return
     end subroutine sfr_read_packagedata
+    
+    !> @ brief Read crosssection block for the package
+    !!
+    !!  Method to read crosssection data for the SFR package.
+    !!
+    !<
+    subroutine sfr_read_crossection(this)
+      ! -- modules
+      use MemoryManagerModule, only: mem_reallocate
+      use sfrCrossSectionManager, only: cross_section_cr, SfrCrossSection
+      ! -- dummy variables
+      class(SfrType),intent(inout) :: this  !< SfrType object
+      ! -- local variables
+      character(len=LINELENGTH) :: keyword
+      character(len=LINELENGTH) :: line
+      logical :: isfound
+      logical :: endOfBlock
+      integer(I4B) :: n
+      integer(I4B) :: ierr
+      integer(I4B) :: ncrossptstot
+      integer, allocatable, dimension(:) :: nboundchk
+      type(SfrCrossSection), pointer :: cross_data => null()
+      !
+      ! -- read cross-section data
+      call this%parser%GetBlock('CROSSSECTIONS', isfound, ierr, &
+                                supportOpenClose=.true., &
+                                blockRequired=.false.)
+      !
+      ! -- parse reach connectivity block if detected
+      if (isfound) then
+        write(this%iout,'(/1x,a)') &
+          'PROCESSING ' // trim(adjustl(this%text)) // ' CROSSSECTIONS'
+        !
+        ! -- allocate and initialize local variables for reach cross-sections
+        allocate(nboundchk(this%maxbound))
+        do n = 1, this%maxbound
+          nboundchk(n) = 0
+        end do
+        !
+        ! -- create and initialize cross-section data
+        call cross_section_cr(cross_data, this%iout, this%iprpak, this%maxbound)
+        call cross_data%initialize(this%ncrossptstot, this%ncrosspts, &
+                                   this%iacross, &
+                                   this%station, this%xsdepths)
+        !
+        ! -- read all of the entries in the block
+        readtable: do
+          call this%parser%GetNextLine(endOfBlock)
+          if (endOfBlock) exit
+          !
+          ! -- get reach number
+          n = this%parser%GetInteger()
+          !
+          ! -- check for reach number error
+          if (n < 1 .or. n > this%maxbound) then
+            write(errmsg, '(a,1x,a,1x,i0)') &
+              'SFR reach in crosssections block is less than one or greater', &
+              'than NREACHES:', n
+            call store_error(errmsg)
+            cycle readtable
+          endif
+          !
+          ! -- increment nboundchk
+          nboundchk(n) = nboundchk(n) + 1
+          !
+          ! -- read FILE keyword
+          call this%parser%GetStringCaps(keyword)
+          select case (keyword)
+            case('TAB6')
+              call this%parser%GetStringCaps(keyword)
+              if(trim(adjustl(keyword)) /= 'FILEIN') then
+                errmsg = 'TAB6 keyword must be followed by "FILEIN" ' //           &
+                          'then by filename.'
+                call store_error(errmsg)
+                cycle readtable
+              end if
+              call this%parser%GetString(line)
+              call cross_data%read_table(n, this%width(n), trim(adjustl(line)))
+            case default
+              write(errmsg,'(a,1x,i4,1x,a)') &
+                'CROSS-SECTION TABLE ENTRY for REACH ', n, &
+                'MUST INCLUDE TAB6 KEYWORD'
+              call store_error(errmsg)
+              cycle readtable
+          end select
+        end do readtable
+        
+        write(this%iout,'(1x,a)') &
+          'END OF ' // trim(adjustl(this%text)) // ' CROSSSECTIONS'
+        
+        !
+        ! -- check for duplicate sfr crosssections
+        do n = 1, this%maxbound
+          if (nboundchk(n) > 1) then
+            write(errmsg,'(a,1x,i0,1x,a,1x,i0,1x,a)') &
+              'Cross-section data for reach', n, &
+              'specified', nboundchk(n), 'times.'
+            call store_error(errmsg)
+          end if
+        end do
+        !
+        ! -- terminate if errors encountered in cross-sections block
+        if (count_errors() > 0) then
+          call this%parser%StoreErrorUnit()
+        end if
+        !
+        ! -- determine the current size of cross-section data
+        ncrossptstot = cross_data%get_ncrossptstot()
+        !
+        ! -- reallocate sfr package cross-section data
+        if (ncrossptstot /= this%ncrossptstot) then
+          this%ncrossptstot = ncrossptstot
+          call mem_reallocate(this%station, this%ncrossptstot, 'STATION', this%memoryPath)
+          call mem_reallocate(this%xsdepths, this%ncrossptstot, 'XSDEPTHS', this%memoryPath)          
+        end if
+        !
+        ! -- write cross-section data to the model listing file
+        call cross_data%output(this%width)
+        !
+        ! -- pack cross-section data
+        call cross_data%pack(this%ncrossptstot, this%ncrosspts, &
+                             this%iacross, &
+                             this%station, this%xsdepths)
+        !
+        ! -- deallocate temporary local storage for reach cross-sections
+        deallocate(nboundchk)
+        call cross_data%destroy()
+        deallocate(cross_data)
+        nullify(cross_data)
+      end if
+      !
+      ! -- return
+      return
+    end subroutine sfr_read_crossection
 
     !> @ brief Read connectiondata for the package
     !!
@@ -991,7 +1189,7 @@ module SfrModule
         if (ival > nconnmax) then
           nconnmax = ival
         end if
-      end do 
+      end do
       !
       ! -- reallocate connection data for package
       call mem_reallocate(this%ja, nja, 'JA', this%memoryPath)
@@ -1083,7 +1281,7 @@ module SfrModule
         
         write(this%iout,'(1x,a)')                                                  &
           'END OF ' // trim(adjustl(this%text)) // ' CONNECTIONDATA'
-        
+          
         do n = 1, this%maxbound
           !
           ! -- check for missing or duplicate sfr connections
@@ -1362,16 +1560,22 @@ module SfrModule
     subroutine sfr_rp(this)
       ! -- modules
       use TdisModule, only: kper, nper
+      use MemoryManagerModule, only: mem_reallocate
+      use sfrCrossSectionManager, only: cross_section_cr, SfrCrossSection
       ! -- dummy variables
       class(SfrType),intent(inout) :: this  !< SfrType object
       ! -- local variables
       character(len=LINELENGTH) :: title
       character(len=LINELENGTH) :: line
+      character(len=LINELENGTH) :: crossfile
       integer(I4B) :: ierr
       integer(I4B) :: n
       integer(I4B) :: ichkustrm
+      integer(I4B) :: ichkcross
+      integer(I4B) :: ncrossptstot
       logical :: isfound
       logical :: endOfBlock
+      type(SfrCrossSection), pointer :: cross_data => null()
       ! -- formats
       character(len=*),parameter :: fmtblkerr = &
         "('Looking for BEGIN PERIOD iper.  Found ', a, ' instead.')"
@@ -1383,6 +1587,7 @@ module SfrModule
       !
       ! -- initialize flags
       ichkustrm = 0
+      ichkcross = 0
       if (kper == 1) then
         ichkustrm = 1
       end if
@@ -1409,6 +1614,7 @@ module SfrModule
             this%ionper = nper + 1
           else
             ! -- Found invalid block
+            call this%parser%GetCurrentLine(line)
             write(errmsg, fmtblkerr) adjustl(trim(line))
             call store_error(errmsg)
             call this%parser%StoreErrorUnit()
@@ -1418,6 +1624,12 @@ module SfrModule
       !
       ! -- Read data if ionper == kper
       if(this%ionper==kper) then
+        !
+        ! -- create and initialize cross-section data
+        call cross_section_cr(cross_data, this%iout, this%iprpak, this%maxbound)
+        call cross_data%initialize(this%ncrossptstot, this%ncrosspts, &
+                                   this%iacross, &
+                                   this%station, this%xsdepths)
         !
         ! -- setup table for period data
         if (this%iprpak /= 0) then
@@ -1452,17 +1664,50 @@ module SfrModule
           end if
           !
           ! -- read data from the rest of the line
-          call this%sfr_set_stressperiod(n, ichkustrm)
+          call this%sfr_set_stressperiod(n, ichkustrm, crossfile)
           !
           ! -- write line to table
           if (this%iprpak /= 0) then
             call this%parser%GetCurrentLine(line)
             call this%inputtab%line_to_columns(line)
           end if
+          !
+          ! -- process cross-section file
+          if (trim(adjustl(crossfile)) /= 'NONE') then
+            call cross_data%read_table(n, this%width(n), trim(adjustl(crossfile)))
+          end if
         end do
+        !
+        ! -- write raw period data 
         if (this%iprpak /= 0) then
           call this%inputtab%finalize_table()
         end if
+        !
+        ! -- finalize cross-sections
+
+        !
+        ! -- determine the current size of cross-section data
+        ncrossptstot = cross_data%get_ncrossptstot()
+        !
+        ! -- reallocate sfr package cross-section data
+        if (ncrossptstot /= this%ncrossptstot) then
+          this%ncrossptstot = ncrossptstot
+          call mem_reallocate(this%station, this%ncrossptstot, 'STATION', this%memoryPath)
+          call mem_reallocate(this%xsdepths, this%ncrossptstot, 'XSDEPTHS', this%memoryPath)          
+        end if
+        !
+        ! -- write cross-section data to the model listing file
+        call cross_data%output(this%width, kstp=1, kper=kper)
+        !
+        ! -- pack cross-section data
+        call cross_data%pack(this%ncrossptstot, this%ncrosspts, &
+                             this%iacross, &
+                             this%station, this%xsdepths)
+        !
+        ! -- deallocate temporary local storage for reach cross-sections
+        call cross_data%destroy()
+        deallocate(cross_data)
+        nullify(cross_data)
       !
       ! -- Reuse data from last stress period
       else
@@ -1835,7 +2080,7 @@ module SfrModule
           r = this%usflow0(n) - this%usflow(n)
           !
           ! -- normalize flow difference and convert to a depth
-          r = r * delt / this%surface_area(n)
+          r = r * delt / this%calc_surface_area(n)
           !
           ! -- evaluate magnitude of differences
           if (n == 1) then
@@ -2103,11 +2348,11 @@ module SfrModule
           call this%stagetab%add_term(cellid)
           depth = this%depth(n)
           stage = this%stage(n)
-          w = this%top_width_wet(n, depth)
+          w = this%calc_top_width_wet(n, depth)
           call this%stagetab%add_term(stage)
           call this%stagetab%add_term(depth)
           call this%stagetab%add_term(w)
-          call this%sfr_calc_cond(n, cond)
+          call this%sfr_calc_cond(n, depth, cond)
           if (node > 0) then
             sbot = this%strtop(n) - this%bthick(n)
             if (hgwf < sbot) then
@@ -2136,15 +2381,17 @@ module SfrModule
     !!  Output SFR package budget summary.
     !!
     !<
-    subroutine sfr_ot_bdsummary(this, kstp, kper, iout)
-      ! -- dummy variables
-      class(SfrType) :: this             !< SfrType object
-      integer(I4B), intent(in) :: kstp   !< time step number
-      integer(I4B), intent(in) :: kper   !< period number
-      integer(I4B), intent(in) :: iout   !< flag and unit number for the model listing file
+    subroutine sfr_ot_bdsummary(this, kstp, kper, iout, ibudfl)
+      ! -- module
+      use TdisModule, only: totim
+      ! -- dummy
+      class(SfrType) :: this              !< SfrType object
+      integer(I4B), intent(in) :: kstp    !< time step number
+      integer(I4B), intent(in) :: kper    !< period number
+      integer(I4B), intent(in) :: iout    !< flag and unit number for the model listing file
+      integer(I4B), intent(in) :: ibudfl  !< flag indicating budget should be written
       !
-      ! -- write budget table
-      call this%budobj%write_budtable(kstp, kper, iout)
+      call this%budobj%write_budtable(kstp, kper, iout, ibudfl, totim)
       !
       ! -- return
       return
@@ -2220,6 +2467,12 @@ module SfrModule
       call mem_deallocate(this%divq)
       call mem_deallocate(this%ndiv)
       !
+      ! -- deallocate cross-section data
+      call mem_deallocate(this%ncrosspts)
+      call mem_deallocate(this%iacross)
+      call mem_deallocate(this%station)
+      call mem_deallocate(this%xsdepths)
+      !
       ! -- deallocate budobj
       call this%budobj%budgetobject_da()
       deallocate(this%budobj)
@@ -2243,6 +2496,7 @@ module SfrModule
       call mem_deallocate(this%iprhed)
       call mem_deallocate(this%istageout)
       call mem_deallocate(this%ibudgetout)
+      call mem_deallocate(this%ibudcsv)
       call mem_deallocate(this%ipakcsv)
       call mem_deallocate(this%idiversions)
       call mem_deallocate(this%maxsfrpicard)
@@ -2257,6 +2511,7 @@ module SfrModule
       call mem_deallocate(this%iconvchk)
       call mem_deallocate(this%idense)
       call mem_deallocate(this%ianynone)
+      call mem_deallocate(this%ncrossptstot)
       nullify(this%gwfiss)
       !
       ! -- call base BndType deallocate
@@ -2396,6 +2651,26 @@ module SfrModule
       call this%obs%StoreObsType('downstream-flow', .true., indx)
       this%obs%obsData(indx)%ProcessIdPtr => sfr_process_obsID
       !
+      ! -- Store obs type and assign procedure pointer
+      !    for depth observation type.
+      call this%obs%StoreObsType('depth', .false., indx)
+      this%obs%obsData(indx)%ProcessIdPtr => sfr_process_obsID
+      !
+      ! -- Store obs type and assign procedure pointer
+      !    for wetted-perimeter observation type.
+      call this%obs%StoreObsType('wet-perimeter', .false., indx)
+      this%obs%obsData(indx)%ProcessIdPtr => sfr_process_obsID
+      !
+      ! -- Store obs type and assign procedure pointer
+      !    for wetted-area observation type.
+      call this%obs%StoreObsType('wet-area', .false., indx)
+      this%obs%obsData(indx)%ProcessIdPtr => sfr_process_obsID
+      !
+      ! -- Store obs type and assign procedure pointer
+      !    for wetted-width observation type.
+      call this%obs%StoreObsType('wet-width', .false., indx)
+      this%obs%obsData(indx)%ProcessIdPtr => sfr_process_obsID
+      !
       ! -- return
       return
     end subroutine sfr_df_obs
@@ -2467,6 +2742,14 @@ module SfrModule
                 if (v > DZERO) then
                   v = -v
                 end if
+              case ('DEPTH')
+                v = this%depth(n)
+              case ('WET-PERIMETER')
+                v = this%calc_perimeter_wet(n, this%depth(n))
+              case ('WET-AREA')
+                v = this%calc_area_wet(n, this%depth(n))
+              case ('WET-WIDTH')
+                v = this%calc_top_width_wet(n, this%depth(n))
               case default
                 msg = 'Unrecognized observation type: ' // trim(obsrv%ObsTypeId)
                 call store_error(msg)
@@ -2556,7 +2839,11 @@ module SfrModule
           !
           ! -- catch non-cumulative observation assigned to observation defined
           !    by a boundname that is assigned to more than one element
-          if (obsrv%ObsTypeId == 'STAGE') then
+          if (obsrv%ObsTypeId == 'STAGE' .or. &
+              obsrv%ObsTypeId == 'DEPTH' .or. &
+              obsrv%ObsTypeId == 'WET-PERIMETER' .or. &
+              obsrv%ObsTypeId == 'WET-AREA' .or. &
+              obsrv%ObsTypeId == 'WET-WIDTH') then
             nn1 = obsrv%NodeNumber
             if (nn1 == NAMEDBOUNDFLAG) then
               if (obsrv%indxbnds_count > 1) then
@@ -2644,13 +2931,14 @@ module SfrModule
     !! Method to read and set period data for a SFR package reach.
     !!
     !<
-    subroutine sfr_set_stressperiod(this, n, ichkustrm)
+    subroutine sfr_set_stressperiod(this, n, ichkustrm, crossfile)
       ! -- modules
       use TimeSeriesManagerModule, only: read_value_or_time_series_adv
       ! -- dummy variables
-      class(SfrType),intent(inout) :: this         !< SfrType object
-      integer(I4B), intent(in) :: n                !< reach number
-      integer(I4B), intent(inout) :: ichkustrm     !< flag indicating if upstream fraction data specified
+      class(SfrType),intent(inout) :: this                   !< SfrType object
+      integer(I4B), intent(in) :: n                          !< reach number
+      integer(I4B), intent(inout) :: ichkustrm               !< flag indicating if upstream fraction data specified
+      character(len=LINELENGTH), intent(inout) :: crossfile  !< cross-section file name
       ! -- local variables
       character(len=10) :: cnum
       character(len=LINELENGTH) :: text
@@ -2660,9 +2948,13 @@ module SfrModule
       integer(I4B) :: ii
       integer(I4B) :: jj
       integer(I4B) :: idiv
+      integer(I4B) :: ixserror
       character (len=10) :: cp
       real(DP) :: divq
       real(DP), pointer :: bndElem => null()
+      !
+      ! -- initialize variables
+      crossfile = 'NONE'
       !
       ! -- read line
       call this%parser%GetStringCaps(keyword)
@@ -2716,7 +3008,7 @@ module SfrModule
           call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                             'BND', this%tsManager, this%iprpak,   &
                                             'RUNOFF')
-      case ('INFLOW')
+        case ('INFLOW')
           call this%parser%GetString(text)
           jj = 1  ! For 'INFLOW'
           bndElem => this%inflow(n)
@@ -2770,6 +3062,31 @@ module SfrModule
           call read_value_or_time_series_adv(text, n, jj, bndElem, this%packName,      &
                                             'BND', this%tsManager, this%iprpak,   &
                                             'USTRF')
+
+        case ('CROSS_SECTION')
+          ixserror = 0
+          !
+          ! -- read FILE keyword
+          call this%parser%GetStringCaps(keyword)
+          select case (keyword)
+            case('TAB6')
+              call this%parser%GetStringCaps(keyword)
+              if(trim(adjustl(keyword)) /= 'FILEIN') then
+                errmsg = 'TAB6 keyword must be followed by "FILEIN" ' //           &
+                          'then by filename.'
+                call store_error(errmsg)
+                ixserror = 1
+              end if
+              if (ixserror == 0) then
+                call this%parser%GetString(crossfile)
+              end if
+            case default
+              write(errmsg,'(a,1x,i4,1x,a)') &
+                'CROSS-SECTION TABLE ENTRY for REACH ', n, &
+                'MUST INCLUDE TAB6 KEYWORD'
+              call store_error(errmsg)
+          end select
+
         case ('AUXILIARY')
           call this%parser%GetStringCaps(caux)
           do jj = 1, this%naux
@@ -2820,6 +3137,7 @@ module SfrModule
       integer(I4B) :: iic4
       integer(I4B) :: ibflg
       real(DP) :: hgwf
+      real(DP) :: sa
       real(DP) :: qu
       real(DP) :: qi
       real(DP) :: qr
@@ -2902,9 +3220,10 @@ module SfrModule
       end do
       this%usflow(n) = qu
       ! -- calculate remaining terms
+      sa = this%calc_surface_area(n)
       qi = this%inflow(n)
-      qr = this%rain(n) * this%width(n) * this%length(n)
-      qe = this%evap(n) * this%width(n) * this%length(n)
+      qr = this%rain(n) * sa
+      qe = this%evap(n) * sa
       qro = this%runoff(n)
       !
       ! -- Water mover term; assume that it goes in at the upstream end of the reach
@@ -2944,7 +3263,7 @@ module SfrModule
       !
       ! -- calculate stream depth at the midpoint
       if (this%iboundpak(n) > 0) then
-        call this%sfr_rectch_depth(n, qmp, d1)
+        call this%sfr_calc_reach_depth(n, qmp, d1)
       else
         this%stage(n) = this%sstage(n)
         d1 = max(DZERO, this%stage(n) - this%strtop(n))
@@ -2962,7 +3281,7 @@ module SfrModule
       !
       ! -- calculate reach conductance for a unit depth of water
       !    if equal to zero will skip iterations
-      call this%sfr_calc_cond(n, cstr)
+      call this%sfr_calc_cond(n, d1, cstr)
       !
       ! -- set flag to skip iterations
       isolve = 1
@@ -3007,8 +3326,8 @@ module SfrModule
         end if
         if (qgwf2 > qsrc) qgwf2 = qsrc
         ! -- calculate two depths
-        call this%sfr_rectch_depth(n, (qmpsrc-DHALF*qgwf1), d1)
-        call this%sfr_rectch_depth(n, (qmpsrc-DHALF*qgwf2), d2)
+        call this%sfr_calc_reach_depth(n, (qmpsrc-DHALF*qgwf1), d1)
+        call this%sfr_calc_reach_depth(n, (qmpsrc-DHALF*qgwf2), d2)
         ! -- determine roots
         if (d1 > DEM30) then
           f1 = en1 - d1
@@ -3053,7 +3372,7 @@ module SfrModule
             call this%sfr_calc_qgwf(n, dpp, hgwf, qgwfp)
             qgwfp = -qgwfp
             if (qgwfp > qsrc) qgwfp = qsrc
-            call this%sfr_rectch_depth(n, (qmpsrc-DHALF*qgwfp), dx)
+            call this%sfr_calc_reach_depth(n, (qmpsrc-DHALF*qgwfp), dx)
             ibflg = 1
           else
             fhstr1 = (qmpsrc-DHALF*qgwf1) - q1
@@ -3114,10 +3433,10 @@ module SfrModule
             if (qgwfp > qsrc) then
               qgwfp = qsrc
               if (abs(en1-en2) < this%dmaxchg*DEM6) then
-                call this%sfr_rectch_depth(n, (qmpsrc-DHALF*qgwfp), dpp)
+                call this%sfr_calc_reach_depth(n, (qmpsrc-DHALF*qgwfp), dpp)
               end if
             end if
-            call this%sfr_rectch_depth(n, (qmpsrc-DHALF*qgwfp), dx)
+            call this%sfr_calc_reach_depth(n, (qmpsrc-DHALF*qgwfp), dx)
           end if
           !
           ! -- bisection to update end points
@@ -3375,8 +3694,8 @@ module SfrModule
       qro = this%runoff(n)
       !
       ! -- calculate rainfall and evap
-      a = this%surface_area(n)
-      ae = this%surface_area_wet(n, depth)
+      a = this%calc_surface_area(n)
+      ae = this%calc_surface_area_wet(n, depth)
       qr = this%rain(n) * a
       qe = this%evap(n) * a
       !
@@ -3440,8 +3759,8 @@ module SfrModule
       call sChSmooth(depth, sat, derv)
       s = this%slope(n)
       r = this%rough(n)
-      aw = this%area_wet(n, depth)
-      wp = this%perimeter_wet(n)
+      aw = this%calc_area_wet(n, depth)
+      wp = this%calc_perimeter_wet(n, depth)
       rh = DZERO
       if (wp > DZERO) then
         rh = aw / wp
@@ -3497,7 +3816,7 @@ module SfrModule
       call sChSmooth(depth, sat, derv)
       !
       ! -- calculate conductance
-      call this%sfr_calc_cond(n, cond)
+      call this%sfr_calc_cond(n, depth, cond)
       !
       ! -- calculate groundwater leakage
       tp = this%strtop(n)
@@ -3530,10 +3849,11 @@ module SfrModule
     !! Method to calculate the reach-aquifer conductance for a SFR package reach.
     !!
     !<
-    subroutine sfr_calc_cond(this, n, cond)
+    subroutine sfr_calc_cond(this, n, depth, cond)
       ! -- dummy variables
       class(SfrType) :: this           !< SfrType object
       integer(I4B), intent(in) :: n    !< reach number
+      real(DP), intent(in) :: depth    !< reach depth
       real(DP), intent(inout) :: cond  !< reach-aquifer conductance
       ! -- local variables
       integer(I4B) :: node
@@ -3546,7 +3866,7 @@ module SfrModule
       node = this%igwfnode(n)
       if (node > 0) then
         if (this%ibound(node) > 0) then
-          wp = this%perimeter_wet(n)
+          wp = this%calc_perimeter_wet(n, depth)
           cond = this%hk(n) * this%length(n) * wp / this%bthick(n)
         end if
       end if
@@ -3620,11 +3940,10 @@ module SfrModule
     
     !> @brief Calculate the depth at the midpoint
     !!
-    !! Method to calculate the depth at the midpoint of rectangular 
-    !! cross-section for a SFR package reach.
+    !! Method to calculate the depth at the midpoint of a reach.
     !!
     !<
-    subroutine sfr_rectch_depth(this, n, q1, d1)
+    subroutine sfr_calc_reach_depth(this, n, q1, d1)
       ! -- dummy variables
       class(SfrType) :: this          !< SfrType object
       integer(I4B), intent(in) :: n   !< reach number
@@ -3636,17 +3955,78 @@ module SfrModule
       real(DP) :: r
       real(DP) :: qconst
       !
-      ! -- calculate stream depth at the midpoint
-      w = this%width(n)
+      ! -- initialize slope and roughness
       s = this%slope(n)
       r = this%rough(n)
-      qconst = this%unitconv * w * sqrt(s) / r
-      d1 = (q1 / qconst)**DP6
-      if (d1 < DEM30) d1 = DZERO
+      !
+      ! -- calculate stream depth at the midpoint
+      if (q1 > DZERO) then
+        if (this%ncrosspts(n) > 1) then
+          call this%sfr_calc_npoint_depth(n, q1, d1)
+        else
+          w = this%station(this%iacross(n))
+          qconst = this%unitconv * w * sqrt(s) / r
+          d1 = (q1 / qconst)**DP6
+        end if
+      else
+        d1 = DZERO
+      end if
+      if (d1 < DEM30) d1 = DZERO ! test removal of this check
       !
       ! -- return
       return
-    end subroutine sfr_rectch_depth
+    end subroutine sfr_calc_reach_depth
+
+
+    !> @brief Calculate the depth at the midpoint of a n-point cross-section
+    !!
+    !! Method to calculate the depth at the midpoint of a reach with a
+    !! n-point cross-section using Newton-Raphson.
+    !!
+    !<
+    subroutine sfr_calc_npoint_depth(this, n, qrch, d)
+      ! -- dummy variables
+      class(SfrType) :: this          !< SfrType object
+      integer(I4B), intent(in) :: n   !< reach number
+      real(DP), intent(in) :: qrch    !< streamflow
+      real(DP), intent(inout) :: d    !< stream depth at midpoint of reach
+      ! -- local variables
+      integer(I4B) :: iter
+      real(DP) :: q0
+      real(DP) :: q1
+      real(DP) :: dq
+      real(DP) :: derv
+      real(DP) :: dd
+      real(DP) :: residual
+      !
+      ! -- initialize variables
+      d = DZERO
+      q0 = DZERO
+      residual = q0 - qrch
+      !
+      ! -- Newton-Raphson iteration
+      nriter: do iter = 1, this%maxsfrit
+        call this%sfr_calc_qman(n, d + this%deps, q1)
+        dq = (q1 - q0)
+        if (dq /= DZERO) then
+            derv = this%deps / (q1 - q0)
+        else
+            derv = DZERO
+        end if
+        dd = derv * residual
+        d = d - dd
+        call this%sfr_calc_qman(n, d, q0)
+        residual = q0 - qrch
+        !
+        ! -- check for convergence
+        if (abs(dd) < this%dmaxchg) then
+          exit nriter
+        end if
+      end do nriter
+      !
+      ! -- return
+      return
+    end subroutine sfr_calc_npoint_depth
 
 
     !> @brief Check reach data
@@ -4363,7 +4743,8 @@ module SfrModule
       !
       ! -- set up budobj
       call budgetobject_cr(this%budobj, this%packName)
-      call this%budobj%budgetobject_df(this%maxbound, nbudterm, 0, 0)
+      call this%budobj%budgetobject_df(this%maxbound, nbudterm, 0, 0, &
+                                       ibudcsv=this%ibudcsv)
       idx = 0
       !
       ! -- Go through and set up each budget term
@@ -4571,6 +4952,7 @@ module SfrModule
       real(DP) :: q
       real(DP) :: qt
       real(DP) :: d
+      real(DP) :: ca
       real(DP) :: a
       !
       ! -- initialize counter
@@ -4598,8 +4980,9 @@ module SfrModule
             end do
           end if
           ! calculate flow area
-          call this%sfr_rectch_depth(n, qt, d)
-          this%qauxcbc(1) = d * this%width(n)
+          call this%sfr_calc_reach_depth(n, qt, d)
+          ca = this%calc_area_wet(n, d)
+          this%qauxcbc(1) = ca
           call this%budobj%budterm(idx)%update_term(n1, n2, q, this%qauxcbc)
         end do
       end do
@@ -4610,7 +4993,8 @@ module SfrModule
       do n = 1, this%maxbound
         n2 = this%igwfnode(n)
         if (n2 > 0) then
-          this%qauxcbc(1) = this%width(n) * this%length(n)
+          a = this%calc_surface_area(n)
+          this%qauxcbc(1) = a
           q = -this%gwflow(n)
           call this%budobj%budterm(idx)%update_term(n, n2, q, this%qauxcbc)
         end if
@@ -4620,7 +5004,7 @@ module SfrModule
       idx = idx + 1
       call this%budobj%budterm(idx)%reset(this%maxbound)
       do n = 1, this%maxbound
-        a = this%surface_area(n)
+        a = this%calc_surface_area(n)
         q = this%rain(n) * a
         call this%budobj%budterm(idx)%update_term(n, n, q)
       end do
@@ -4677,7 +5061,7 @@ module SfrModule
       do n = 1, this%maxbound
         q = DZERO
         d = this%depth(n)
-        a = this%width(n) * this%length(n)
+        a = this%calc_surface_area_wet(n, d)
         this%qauxcbc(1) = a * d
         call this%budobj%budterm(idx)%update_term(n, n, q, this%qauxcbc)
       end do
@@ -4810,20 +5194,32 @@ module SfrModule
     !! Function to calculate the wetted area for a SFR package reach.
     !!
     !<
-    function area_wet(this, n, depth)
+    function calc_area_wet(this, n, depth)
       ! -- return variable
-      real(DP) :: area_wet            !< wetted area
+      real(DP) :: calc_area_wet       !< wetted area
       ! -- dummy variables
       class(SfrType) :: this          !< SfrType object
       integer(I4B), intent(in) :: n   !< reach number
       real(DP), intent(in) :: depth   !< reach depth
+      ! -- local variables
+      integer(I4B) :: npts
+      integer(I4B) :: i0
+      integer(I4B) :: i1
       !
       ! -- Calculate wetted area
-      area_wet = depth * this%width(n)
+      npts = this%ncrosspts(n)
+      i0 = this%iacross(n)
+      i1 = this%iacross(n + 1) - 1
+      if (npts > 1) then
+        calc_area_wet = get_cross_section_area(npts, this%station(i0:i1), &
+                                               this%xsdepths(i0:i1), depth)
+      else
+        calc_area_wet = this%station(i0) * depth
+      end if
       !
       ! -- return
       return
-    end function area_wet
+    end function calc_area_wet
     
     
     !> @brief Calculate wetted perimeter
@@ -4831,84 +5227,123 @@ module SfrModule
     !! Function to calculate the wetted perimeter for a SFR package reach.
     !!
     !<
-    function perimeter_wet(this, n)
+    function calc_perimeter_wet(this, n, depth)
       ! -- return variable
-      real(DP) :: perimeter_wet        !< wetted perimeter
+      real(DP) :: calc_perimeter_wet   !< wetted perimeter
       ! -- dummy variables
       class(SfrType) :: this           !< SfrType object
       integer(I4B), intent(in) :: n    !< reach number
+      real(DP), intent(in) :: depth    !< reach depth
+      ! -- local variables
+      integer(I4B) :: npts
+      integer(I4B) :: i0
+      integer(I4B) :: i1
       !
       ! -- Calculate wetted perimeter
-      perimeter_wet = this%width(n)
+      npts = this%ncrosspts(n)
+      i0 = this%iacross(n)
+      i1 = this%iacross(n + 1) - 1
+      if (npts > 1) then
+        calc_perimeter_wet = get_wetted_perimeter(npts, this%station(i0:i1), &
+                                                  this%xsdepths(i0:i1), depth)
+      else
+        calc_perimeter_wet = this%station(i0) ! no depth dependence in original implementation
+      end if
       !
       ! -- return
       return
-    end function perimeter_wet
+    end function calc_perimeter_wet
 
     !> @brief Calculate maximum surface area
     !!
     !! Function to calculate the maximum surface area for a SFR package reach.
     !!
     !<
-    function surface_area(this, n)
+    function calc_surface_area(this, n)
       ! -- return variable
-      real(DP) :: surface_area       !< surface area
+      real(DP) :: calc_surface_area  !< surface area
       ! -- dummy variables
       class(SfrType) :: this         !< SfrType object
       integer(I4B), intent(in) :: n  !< reach number
+      ! -- local variables
+      integer(I4B) :: npts
+      integer(I4B) :: i0
+      integer(I4B) :: i1
+      real(DP) :: top_width
       !
       ! -- Calculate surface area
-      surface_area = this%width(n) * this%length(n)
+      npts = this%ncrosspts(n)
+      i0 = this%iacross(n)
+      i1 = this%iacross(n + 1) - 1
+      if (npts > 1) then
+        top_width = get_saturated_topwidth(npts, this%station(i0:i1))
+      else
+        top_width = this%station(i0)
+      end if
+      calc_surface_area = top_width * this%length(n)
       !
       ! -- return
       return
-    end function surface_area  
+    end function calc_surface_area  
     
     !> @brief Calculate wetted surface area
     !!
     !! Function to calculate the wetted surface area for a SFR package reach.
     !!
     !<
-    function surface_area_wet(this, n, depth)
+    function calc_surface_area_wet(this, n, depth)
       ! -- return variable
-      real(DP) :: surface_area_wet   !< wetted surface area
+      real(DP) :: calc_surface_area_wet !< wetted surface area
       ! -- dummy variables
-      class(SfrType) :: this         !< SfrType object
-      integer(I4B), intent(in) :: n  !< reach number
-      real(DP), intent(in) :: depth  !< reach depth
+      class(SfrType) :: this            !< SfrType object
+      integer(I4B), intent(in) :: n     !< reach number
+      real(DP), intent(in) :: depth     !< reach depth
       ! -- local variables
       real(DP) :: top_width
       !
       ! -- Calculate wetted surface area
-      top_width = this%top_width_wet(n, depth)
-      surface_area_wet = top_width * this%length(n)
+      top_width = this%calc_top_width_wet(n, depth)
+      calc_surface_area_wet = top_width * this%length(n)
       !
       ! -- return
       return
-    end function surface_area_wet
+    end function calc_surface_area_wet
     
     !> @brief Calculate wetted top width
     !!
     !! Function to calculate the wetted top width for a SFR package reach.
     !!
     !<
-    function top_width_wet(this, n, depth)
+    function calc_top_width_wet(this, n, depth)
       ! -- return variable
-      real(DP) :: top_width_wet      !< wetted top width
+      real(DP) :: calc_top_width_wet  !< wetted top width
       ! -- dummy variables
-      class(SfrType) :: this         !< SfrType object
-      integer(I4B), intent(in) :: n  !< reach number
-      real(DP), intent(in) :: depth  !< reach depth
+      class(SfrType) :: this          !< SfrType object
+      integer(I4B), intent(in) :: n   !< reach number
+      real(DP), intent(in) :: depth   !< reach depth
       ! -- local variables
+      integer(I4B) :: npts
+      integer(I4B) :: i0
+      integer(I4B) :: i1
       real(DP) :: sat
       !
       ! -- Calculate wetted top width
+      npts = this%ncrosspts(n)
+      i0 = this%iacross(n)
+      i1 = this%iacross(n + 1) - 1
       sat = sCubicSaturation(DEM5, DZERO, depth, DEM5)
-      top_width_wet = this%width(n) * sat
+      if (npts > 1) then
+        calc_top_width_wet = sat * get_wetted_topwidth(npts, &
+                                                       this%station(i0:i1), &
+                                                       this%xsdepths(i0:i1), &
+                                                       depth)        
+      else
+        calc_top_width_wet = sat * this%station(i0)
+      end if
       !
       ! -- return
       return
-    end function top_width_wet
+    end function calc_top_width_wet
 
     !> @brief Activate density terms
     !!

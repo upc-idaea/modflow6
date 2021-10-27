@@ -3,6 +3,7 @@
 # a smaller time step.
 
 import os
+import pytest
 import sys
 import numpy as np
 
@@ -33,7 +34,7 @@ def get_idomain(nlay, nrow, ncol, lakend):
     return idomain
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     lx = 300.0
     lz = 45.0
     nlay = 45
@@ -227,14 +228,7 @@ def get_model(idx, dir):
         printrecord=[("HEAD", "ALL"), ("BUDGET", "ALL")],
     )
 
-    return sim
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim = get_model(idx, dir)
-        sim.write_simulation()
-    return
+    return sim, None
 
 
 def make_plot_xsect(sim, headall, stageall):
@@ -443,33 +437,30 @@ def eval_results(sim):
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
+    # build the model
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_results, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_results, idxsim=idx))
 
 
 def main():
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_results, idxsim=idx)
         test.run_mf6(sim)
-
-    return
 
 
 if __name__ == "__main__":

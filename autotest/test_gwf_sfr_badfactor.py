@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import numpy as np
 import shutil
@@ -22,19 +23,18 @@ mf6_exe = os.path.abspath(targets.target_dict["mf6"])
 paktest = "sfr"
 testname = "ts_sfr01"
 testdir = os.path.join("temp", testname)
-if not os.path.isdir(testdir):
-    os.mkdir(testdir)
+os.makedirs(testdir, exist_ok=True)
 everything_was_successful = True
 
 
-def get_model(timeseries=False):
+def build_model(timeseries=False):
     # static model data
     # temporal discretization
     nper = 1
     tdis_rc = []
     for idx in range(nper):
         tdis_rc.append((1.0, 1, 1.0))
-    ts_times = np.arange(0.0, 2.0, 1.0, dtype=np.float)
+    ts_times = np.arange(0.0, 2.0, 1.0, dtype=float)
 
     auxnames = ["temp", "conc"]
     temp, conc = 32.5, 0.1
@@ -529,16 +529,11 @@ def get_model(timeseries=False):
     return sim
 
 
-def build_models():
-    sim = get_model()
-    sim.write_simulation()
-    return sim
-
-
 # - No need to change any code below
 def test_mf6model():
     # build and run the test model
-    sim = build_models()
+    sim = build_model()
+    sim.write_simulation()
     sim.run_simulation()
 
     # ensure that the error msg is contained in the mfsim.lst file
@@ -562,7 +557,8 @@ def test_mf6model():
 
 def main():
     # build and run the test model
-    sim = build_models()
+    sim = build_model()
+    sim.write_simulation()
     sim.run_simulation()
 
     # ensure that the error msg is contained in the mfsim.lst file

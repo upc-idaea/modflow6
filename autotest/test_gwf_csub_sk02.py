@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 
 try:
@@ -204,7 +205,7 @@ ds17 = [
 ]
 
 
-def build_model(idx, ws):
+def get_model(idx, ws):
     name = ex[idx]
     newton = newtons[idx]
     newtonoptions = None
@@ -348,16 +349,16 @@ def build_model(idx, ws):
     return sim
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
 
     # build MODFLOW 6 files
     ws = dir
-    sim = build_model(idx, ws)
+    sim = get_model(idx, ws)
 
     # build comparison files
     cpth = cmppths[idx]
     ws = os.path.join(dir, cpth)
-    mc = build_model(idx, ws)
+    mc = get_model(idx, ws)
 
     return sim, mc
 
@@ -487,16 +488,13 @@ def eval_comp(sim):
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_simulation()
-    return
 
 
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
     r_exe = None
@@ -508,13 +506,13 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        if is_CI and not continuous_integration[idx]:
-            continue
-        yield test.run_mf6, Simulation(
+    # run the test model
+    if is_CI and not continuous_integration[idx]:
+        return
+    test.run_mf6(
+        Simulation(
             dir,
             exfunc=eval_comp,
             exe_dict=r_exe,
@@ -522,6 +520,7 @@ def test_mf6model():
             idxsim=idx,
             mf6_regression=True,
         )
+    )
 
     return
 
@@ -531,10 +530,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(
             dir,
             exfunc=eval_comp,

@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 
 try:
@@ -114,17 +115,17 @@ sub6 = [
 ]
 
 
-def get_model(idx, dir):
-    sim = build_model(idx, dir, adjustmat=True)
+def build_model(idx, dir):
+    sim = get_model(idx, dir, adjustmat=True)
 
     # build MODFLOW-6 with constant material properties
     pth = os.path.join(dir, compdir)
-    mc = build_model(idx, pth, None)
+    mc = get_model(idx, pth, None)
 
     return sim, mc
 
 
-def build_model(idx, dir, adjustmat=False):
+def get_model(idx, dir, adjustmat=False):
     name = ex[idx]
 
     # build MODFLOW 6 files
@@ -478,16 +479,13 @@ def cbc_compare(sim):
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_simulation()
-    return
 
 
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
     r_exe = None
@@ -499,28 +497,21 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        if is_CI and not continuous_integration[idx]:
-            continue
-        yield test.run_mf6, Simulation(
-            dir, exfunc=eval_sub, exe_dict=r_exe, idxsim=idx
-        )
-
-    return
+    # run the test model
+    if is_CI and not continuous_integration[idx]:
+        return
+    test.run_mf6(Simulation(dir, exfunc=eval_sub, exe_dict=r_exe, idxsim=idx))
 
 
 def main():
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(
             dir, exfunc=eval_sub, exe_dict=replace_exe, idxsim=idx
         )

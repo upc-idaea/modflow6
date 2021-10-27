@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import numpy as np
 import shutil
@@ -25,15 +26,14 @@ import targets
 mf6_exe = os.path.abspath(targets.target_dict["mf6"])
 testname = "uzf_3lay_srfdchk"
 testdir = os.path.join("temp", testname)
-if not os.path.isdir(testdir):
-    os.mkdir(testdir)
+os.makedirs(testdir, exist_ok=True)
 everything_was_successful = True
 
 iuz_cell_dict = {}
 cell_iuz_dict = {}
 
 
-def get_model():
+def build_model():
 
     nlay, nrow, ncol = 3, 1, 10
     nper = 1
@@ -212,16 +212,11 @@ def get_model():
     return sim
 
 
-def build_models():
-    sim = get_model()
-    sim.write_simulation()
-    return sim
-
-
 # - No need to change any code below
 def test_mf6model():
     # build and run the test model
-    sim = build_models()
+    sim = build_model()
+    sim.write_simulation()
     sim.run_simulation()
 
     # ensure that the error msg is contained in the mfsim.lst file
@@ -245,7 +240,8 @@ def test_mf6model():
 
 def main():
     # build and run the test model
-    sim = build_models()
+    sim = build_model()
+    sim.write_simulation()
     sim.run_simulation()
 
     # ensure that the error msg is contained in the mfsim.lst file

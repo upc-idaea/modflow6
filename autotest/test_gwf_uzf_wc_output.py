@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import numpy as np
 import targets
@@ -568,6 +569,7 @@ def eval_model(sim, mfnwt, include_NWT=False):
 
 # - No need to change any code below
 def test_mf6model():
+
     include_NWT = False
     # initialize testing framework
     test = testing_framework()
@@ -575,7 +577,7 @@ def test_mf6model():
     # build and write the model input
     mf6, mfnwt = build_models(include_NWT=include_NWT)
 
-    # run the test models
+    # run the test model
     mf6.run_simulation()
     if include_NWT:
         mfnwt.run_model()
@@ -597,7 +599,7 @@ def main():
     # build the models
     mf6, mfnwt = build_models(include_NWT=include_NWT)
 
-    # run the test models
+    # run the test model
     mf6.run_simulation()
     if include_NWT:
         mfnwt.run_model()

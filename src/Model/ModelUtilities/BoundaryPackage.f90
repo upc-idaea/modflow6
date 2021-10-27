@@ -1,4 +1,4 @@
-!> @brief This module contains the base model package 
+!> @brief This module contains the base boundary package 
 !!
 !! This module contains the base model boundary package class that is 
 !! extended by all model boundary packages. The base model boundary 
@@ -38,6 +38,11 @@ module BndModule
   public :: save_print_model_flows
   private :: CastAsBndClass
 
+  !> @ brief BndType
+  !!
+  !!  Generic boundary package type.  This derived type can be overriden to
+  !!  become concrete boundary package types.
+  !<
   type, extends(NumericalPackageType) :: BndType
     ! -- characters
     character(len=LENLISTLABEL), pointer :: listlabel  => null()                 !< title of table written for RP
@@ -791,12 +796,13 @@ module BndModule
     !!  to the model listing file.
     !!
     !<
-    subroutine bnd_ot_bdsummary(this, kstp, kper, iout)
+    subroutine bnd_ot_bdsummary(this, kstp, kper, iout, ibudfl)
       ! -- dummy variables
-      class(BndType) :: this            !< BndType object
-      integer(I4B), intent(in) :: kstp  !< time step number
-      integer(I4B), intent(in) :: kper  !< period number
-      integer(I4B), intent(in) :: iout  !< flag and unit number for the model listing file
+      class(BndType) :: this              !< BndType object
+      integer(I4B), intent(in) :: kstp    !< time step number
+      integer(I4B), intent(in) :: kper    !< period number
+      integer(I4B), intent(in) :: iout    !< flag and unit number for the model listing file
+      integer(I4B), intent(in) :: ibudfl  !< flag indicating budget should be written
       !
       ! -- override for advanced packages
       !
@@ -1835,9 +1841,7 @@ module BndModule
         do i = 1, nbound
           node = nodelist(i)
           if (node > 0) then
-            if (ibound(node) > 0) then
-              maxrows = maxrows + 1
-            end if
+            maxrows = maxrows + 1
           end if
         end do
         if (maxrows > 0) then
@@ -1890,30 +1894,30 @@ module BndModule
           ! -- If cell is no-flow or constant-head, then ignore it.
           rrate = DZERO
           if (node > 0) then
-              !
-              ! -- Use simval, which was calculated in cq()
-              rrate = flow(i)
-              !
-              ! -- Print the individual rates if the budget is being printed
-              !    and PRINT_FLOWS was specified (iprflow < 0)
-              if (ibudfl /= 0) then
-                if (iprflow /= 0) then
-                  !
-                  ! -- set nodestr and write outputtab table
-                  nodeu = dis%get_nodeuser(node)
-                  call dis%nodeu_to_string(nodeu, nodestr)
-                  call outputtab%print_list_entry(i, trim(adjustl(nodestr)),  &
-                                                      rrate, bname)
-                end if
+            !
+            ! -- Use simval, which was calculated in cq()
+            rrate = flow(i)
+            !
+            ! -- Print the individual rates if the budget is being printed
+            !    and PRINT_FLOWS was specified (iprflow < 0).  Rates are 
+            !    printed even if ibound < 1.
+            if (ibudfl /= 0) then
+              if (iprflow /= 0) then
+                !
+                ! -- set nodestr and write outputtab table
+                nodeu = dis%get_nodeuser(node)
+                call dis%nodeu_to_string(nodeu, nodestr)
+                call outputtab%print_list_entry(i, trim(adjustl(nodestr)),     &
+                                                    rrate, bname)
               end if
+            end if
             !
             ! -- If saving cell-by-cell flows in list, write flow
             if (ibinun /= 0) then
               n2 = i
               if (present(imap)) n2 = imap(i)
-              call dis%record_mf6_list_entry(ibinun, node, n2, rrate,         &
-                                                  naux, auxvar(:,i),          &
-                                                  olconv2=.FALSE.)
+              call dis%record_mf6_list_entry(ibinun, node, n2, rrate, naux,    &
+                                             auxvar(:,i), olconv2=.FALSE.)
             end if
           end if
           !

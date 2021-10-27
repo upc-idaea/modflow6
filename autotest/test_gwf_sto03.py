@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 
 try:
@@ -90,7 +91,7 @@ for idx in range(nper):
     well_spd[idx] = [[0, 0, 0, mult * absrate]]
 
 
-def build_model(name, ws, newton_bool, offset=0.0):
+def get_model(name, ws, newton_bool, offset=0.0):
     # build MODFLOW 6 files
     sim = flopy.mf6.MFSimulation(
         sim_name=name, version="mf6", exe_name="mf6", sim_ws=ws
@@ -192,25 +193,17 @@ def build_model(name, ws, newton_bool, offset=0.0):
 
 
 # variant SUB package problem 3
-def get_model(idx, dir):
+def build_model(idx, dir):
     name = ex[idx]
     ws = dir
 
     # build model with no offset
-    sim = build_model(name, ws, newton_bool=newton[idx])
+    sim = get_model(name, ws, newton_bool=newton[idx])
 
     # build model with offset
     ws = os.path.join(dir, cmppth)
-    mc = build_model(name, ws, newton_bool=newton[idx], offset=cmp_offset)
+    mc = get_model(name, ws, newton_bool=newton[idx], offset=cmp_offset)
     return sim, mc
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        mc.write_simulation()
-    return
 
 
 def eval_hmax(fpth):
@@ -291,7 +284,11 @@ def eval_sto(sim):
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
 
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
@@ -304,17 +301,16 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        if is_CI and not continuous_integration[idx]:
-            continue
-        yield test.run_mf6, Simulation(
+    # run the test model
+    if is_CI and not continuous_integration[idx]:
+        return
+    test.run_mf6(
+        Simulation(
             dir, exfunc=eval_sto, exe_dict=r_exe, htol=htol[idx], idxsim=idx
         )
-
-    return
+    )
 
 
 def main():
@@ -322,10 +318,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(
             dir,
             exfunc=eval_sto,

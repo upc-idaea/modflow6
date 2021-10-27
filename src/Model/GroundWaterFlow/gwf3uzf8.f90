@@ -41,6 +41,7 @@ module UzfModule
     integer(I4B), pointer :: iprwcont => null()
     integer(I4B), pointer :: iwcontout => null()
     integer(I4B), pointer :: ibudgetout => null()
+    integer(I4B), pointer :: ibudcsv => null()  !< unit number for csv budget output file
     integer(I4B), pointer :: ipakcsv => null()
     !
     type(BudgetObjectType), pointer                    :: budobj      => null()
@@ -70,10 +71,7 @@ module UzfModule
     integer(I4B), pointer                               :: nsets        => null()
     integer(I4B), pointer                               :: nwav         => null()
     integer(I4B), pointer                               :: nodes        => null()
-    integer(I4B), pointer                               :: nper         => null()
-    integer(I4B), pointer                               :: nstp         => null()
     integer(I4B), pointer                               :: readflag     => null()
-    integer(I4B), pointer                               :: outunitbud   => null()
     integer(I4B), pointer                               :: ietflag      => null()  !< et flag, 0 is off, 1 or 2 are different types
     integer(I4B), pointer                               :: igwetflag    => null()
     integer(I4B), pointer                               :: iseepflag    => null()
@@ -426,7 +424,7 @@ contains
     character(len=*),parameter :: fmtuznlay = &
       "(4x, 'UNSATURATED FLOW WILL BE SIMULATED SEPARATELY IN EACH LAYER.')"
     character(len=*),parameter :: fmtuzfbin = &
-      "(4x, 'UZF ', 1x, a, 1x, ' WILL BE SAVED TO FILE: ', a, /4x, 'OPENED ON UNIT: ', I7)"
+      "(4x, 'UZF ', 1x, a, 1x, ' WILL BE SAVED TO FILE: ', a, /4x, 'OPENED ON UNIT: ', I0)"
     character(len=*),parameter :: fmtuzfopt = &
       "(4x, 'UZF ', a, ' VALUE (',g15.7,') SPECIFIED.')"
 
@@ -462,6 +460,18 @@ contains
           found = .true.
         else
           call store_error('OPTIONAL BUDGET KEYWORD MUST BE FOLLOWED BY FILEOUT')
+        end if
+      case('BUDGETCSV')
+        call this%parser%GetStringCaps(keyword)
+        if (keyword == 'FILEOUT') then
+          call this%parser%GetString(fname)
+          this%ibudcsv = getunit()
+          call openfile(this%ibudcsv, this%iout, fname, 'CSV', &
+            filstat_opt='REPLACE')
+          write(this%iout,fmtuzfbin) 'BUDGET CSV', fname, this%ibudcsv
+        else
+          call store_error('OPTIONAL BUDGETCSV KEYWORD MUST BE FOLLOWED BY &
+            &FILEOUT')
         end if
       case('PACKAGE_CONVERGENCE')
         call this%parser%GetStringCaps(keyword)
@@ -1656,12 +1666,20 @@ contains
     end if 
   end subroutine uzf_ot_dv
   
-  subroutine uzf_ot_bdsummary(this, kstp, kper, iout)
-    class(UzfType) :: this
-    integer(I4B), intent(in) :: kstp
-    integer(I4B), intent(in) :: kper
-    integer(I4B), intent(in) :: iout
-    call this%budobj%write_budtable(kstp, kper, iout)
+  subroutine uzf_ot_bdsummary(this, kstp, kper, iout, ibudfl)
+    ! -- module
+    use TdisModule, only: totim
+    ! -- dummy
+    class(UzfType) :: this              !< UzfType object
+    integer(I4B), intent(in) :: kstp    !< time step number
+    integer(I4B), intent(in) :: kper    !< period number
+    integer(I4B), intent(in) :: iout    !< flag and unit number for the model listing file
+    integer(I4B), intent(in) :: ibudfl  !< flag indicating budget should be written
+    !
+    call this%budobj%write_budtable(kstp, kper, iout, ibudfl, totim)
+    !
+    ! -- return
+    return
   end subroutine uzf_ot_bdsummary
   
   subroutine uzf_solve(this, reset_state)
@@ -2601,6 +2619,7 @@ contains
       ! Integer can't be read from strng; it's presumed to be a boundary
       ! name (already converted to uppercase)
       obsrv%FeatureName = strng(istart:istop)
+      !obsrv%FeatureName = trim(adjustl(strng))
       ! -- Observation may require summing rates from multiple boundaries,
       !    so assign NodeNumber as a value that indicates observation
       !    is for a named boundary or group of boundaries.
@@ -2639,13 +2658,13 @@ contains
     call mem_allocate(this%iprwcont, 'IPRWCONT', this%memoryPath)
     call mem_allocate(this%iwcontout, 'IWCONTOUT', this%memoryPath)
     call mem_allocate(this%ibudgetout, 'IBUDGETOUT', this%memoryPath)
+    call mem_allocate(this%ibudcsv, 'IBUDCSV', this%memoryPath)
     call mem_allocate(this%ipakcsv, 'IPAKCSV', this%memoryPath)
     call mem_allocate(this%ntrail, 'NTRAIL', this%memoryPath)
     call mem_allocate(this%nsets, 'NSETS', this%memoryPath)
     call mem_allocate(this%nodes, 'NODES', this%memoryPath)
     call mem_allocate(this%istocb, 'ISTOCB', this%memoryPath)
     call mem_allocate(this%nwav, 'NWAV', this%memoryPath)
-    call mem_allocate(this%outunitbud, 'OUTUNITBUD', this%memoryPath)
     call mem_allocate(this%totfluxtot, 'TOTFLUXTOT', this%memoryPath)
     call mem_allocate(this%bditems, 'BDITEMS', this%memoryPath)
     call mem_allocate(this%nbdtxt, 'NBDTXT', this%memoryPath)
@@ -2665,6 +2684,7 @@ contains
     this%iprwcont = 0
     this%iwcontout = 0
     this%ibudgetout = 0
+    this%ibudcsv = 0
     this%ipakcsv = 0
     this%istocb = 0
     this%bditems = 7
@@ -2726,13 +2746,13 @@ contains
     call mem_deallocate(this%iprwcont)
     call mem_deallocate(this%iwcontout)
     call mem_deallocate(this%ibudgetout)
+    call mem_deallocate(this%ibudcsv)
     call mem_deallocate(this%ipakcsv)
     call mem_deallocate(this%ntrail)
     call mem_deallocate(this%nsets)
     call mem_deallocate(this%nodes)
     call mem_deallocate(this%istocb)
     call mem_deallocate(this%nwav)
-    call mem_deallocate(this%outunitbud)
     call mem_deallocate(this%totfluxtot)
     call mem_deallocate(this%bditems)
     call mem_deallocate(this%nbdtxt)
@@ -2836,7 +2856,8 @@ contains
     !
     ! -- set up budobj
     call budgetobject_cr(this%budobj, this%packName)
-    call this%budobj%budgetobject_df(this%maxbound, nbudterm, 0, 0)
+    call this%budobj%budgetobject_df(this%maxbound, nbudterm, 0, 0, &
+                                     ibudcsv=this%ibudcsv)
     idx = 0
     !
     ! -- Go through and set up each budget term

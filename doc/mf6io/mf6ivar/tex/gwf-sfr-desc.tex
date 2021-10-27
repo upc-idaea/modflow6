@@ -25,6 +25,10 @@
 
 \item \texttt{budgetfile}---name of the binary output file to write budget information.
 
+\item \texttt{BUDGETCSV}---keyword to specify that record corresponds to the budget CSV.
+
+\item \texttt{budgetcsvfile}---name of the comma-separated value (CSV) output file to write budget summary information.  A budget summary record will be written to this file for each time step of the simulation.
+
 \item \texttt{PACKAGE\_CONVERGENCE}---keyword to specify that record corresponds to the package convergence comma spaced values file.
 
 \item \texttt{package\_convergence\_filename}---name of the comma spaced values output file to write package convergence information.
@@ -88,6 +92,18 @@
 \item \texttt{boundname}---name of the stream reach cell.  BOUNDNAME is an ASCII character variable that can contain as many as 40 characters.  If BOUNDNAME contains spaces in it, then the entire name must be enclosed within single quotes.
 
 \end{description}
+\item \textbf{Block: CROSSSECTIONS}
+
+\begin{description}
+\item \texttt{rno}---integer value that defines the reach number associated with the specified cross-section table file on the line. RNO must be greater than zero and less than or equal to NREACHES. The program will also terminate with an error if table information for a reach is specified more than once.
+
+\item \texttt{TAB6}---keyword to specify that record corresponds to a cross-section table file.
+
+\item \texttt{FILEIN}---keyword to specify that an input filename is expected next.
+
+\item \texttt{tab6\_filename}---character string that defines the path and filename for the file containing cross-section table data for the reach. The TAB6\_FILENAME file includes the number of entries in the file and the station elevation data in terms of the fractional width and the reach depth. Instructions for creating the TAB6\_FILENAME input file are provided in SFR Reach Cross-Section Table Input File section.
+
+\end{description}
 \item \textbf{Block: CONNECTIONDATA}
 
 \begin{description}
@@ -127,6 +143,7 @@ EVAPORATION <@evaporation@>
 RUNOFF <@runoff@>
 DIVERSION <idv> <@divflow@> 
 UPSTREAM_FRACTION <upstream_fraction>
+CROSS_SECTION TAB6 FILEIN <tab6_filename> 
 AUXILIARY <auxname> <@auxval@> 
 \end{lstlisting}
 
@@ -151,6 +168,14 @@ AUXILIARY <auxname> <@auxval@>
 \item \textcolor{blue}{\texttt{divflow}---real or character value that defines the volumetric diversion (DIVFLOW) rate for the streamflow routing reach. If the Options block includes a TIMESERIESFILE entry (see the ``Time-Variable Input'' section), values can be obtained from a time series by entering the time-series name in place of a numeric value.}
 
 \item \texttt{upstream\_fraction}---real value that defines the fraction of upstream flow (USTRF) from each upstream reach that is applied as upstream inflow to the reach. The sum of all USTRF values for all reaches connected to the same upstream reach must be equal to one.
+
+\item \texttt{CROSS\_SECTION}---keyword to specify that record corresponds to a reach cross-section.
+
+\item \texttt{TAB6}---keyword to specify that record corresponds to a cross-section table file.
+
+\item \texttt{FILEIN}---keyword to specify that an input filename is expected next.
+
+\item \texttt{tab6\_filename}---character string that defines the path and filename for the file containing cross-section table data for the reach. The TAB6\_FILENAME file includes the number of entries in the file and the station elevation data in terms of the fractional width and the reach depth. Instructions for creating the TAB6\_FILENAME input file are provided in SFR Reach Cross-Section Table Input File section.
 
 \item \texttt{AUXILIARY}---keyword for specifying auxiliary variable.
 

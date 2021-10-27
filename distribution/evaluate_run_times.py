@@ -11,7 +11,7 @@ VERIFY = False
 
 # add path to build script in autotest directory and reuse mf6 build scripts
 sys.path.append(os.path.join("..", "autotest"))
-from get_build_exes import build_mf6
+from build_exes import build_mf6
 
 github_repo = "MODFLOW-USGS/modflow6"
 working_dir = "./temp/"
@@ -28,8 +28,9 @@ def _get_version():
             version = sys.argv[idx + 1]
             break
     if version is None:
-        version = pymake.repo_latest_version(github_repo=github_repo,
-                                             verify=VERIFY)
+        version = pymake.repo_latest_version(
+            github_repo=github_repo, verify=VERIFY
+        )
     return version
 
 
@@ -62,8 +63,9 @@ def _get_previous_version():
         github_repo
     ) + "/releases/download/{0}/mf{0}.zip".format(version)
     if not _is_dryrun():
-        pymake.download_and_unzip(url, pth=working_dir, verbose=True,
-                                  verify=VERIFY)
+        pymake.download_and_unzip(
+            url, pth=working_dir, verbose=True, verify=VERIFY
+        )
 
     return version, "mf{}".format(version)
 
@@ -103,19 +105,28 @@ def get_mf6_cmdargs(app, argv, text="mf6:", verbose=False):
             return_text = c[idx0:].strip()
     return return_text
 
+
 def get_mf6_version(app, verbose=False):
-    version = get_mf6_cmdargs(app, [app, "-v"], verbose=verbose)
+    text = "mf6:"
+    if app.endswith(".exe"):
+        text = "mf6.exe:"
+    version = get_mf6_cmdargs(app, [app, "-v"], text=text, verbose=verbose)
     if version is not None:
         version = version.split()[0]
         if verbose:
             print("version: {}".format(version))
     return version
 
+
 def get_mf6_compiler(app, verbose=False):
-    compiler = get_mf6_cmdargs(app, [app, "-c"], verbose=verbose)
+    text = "mf6:"
+    if app.endswith(".exe"):
+        text = "mf6.exe:"
+    compiler = get_mf6_cmdargs(app, [app, "-c"], text=text, verbose=verbose)
     if verbose and compiler is not None:
         print("compiler: {}".format(compiler))
     return compiler
+
 
 def revert_files(app, example):
     replace_dict = {
@@ -182,8 +193,9 @@ def elapsed_string_to_real(elt_str):
 
 def get_examples():
     examples_repo = "MODFLOW-USGS/modflow6-examples"
-    version = pymake.repo_latest_version(github_repo=examples_repo,
-                                         verify=VERIFY)
+    version = pymake.repo_latest_version(
+        github_repo=examples_repo, verify=VERIFY
+    )
     print("current examples version: {}".format(version))
     url = "https://github.com/{}".format(
         examples_repo
@@ -219,6 +231,7 @@ def run_model(app, app0, example, fmd, silent=True, pool=False):
     prev_dir = os.path.join(example, "previous")
     if os.path.isdir(prev_dir):
         shutil.rmtree(prev_dir)
+    print("Copying {} ==> {}".format(example, prev_dir))
     shutil.copytree(example, prev_dir)
 
     # modify input files to use deprecated keywords in directory
@@ -232,7 +245,10 @@ def run_model(app, app0, example, fmd, silent=True, pool=False):
     # success0, buff0 = run_function(app0, prev_dir)
 
     # processing options
-    args = ((app, example), (app0, prev_dir),)
+    args = (
+        (app, example),
+        (app0, prev_dir),
+    )
 
     # Multi-processing using Pool
     # initialize the pool

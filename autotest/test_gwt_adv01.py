@@ -6,6 +6,7 @@ model grid of square cells.
 """
 
 import os
+import pytest
 import sys
 import numpy as np
 
@@ -28,7 +29,7 @@ for s in ex:
 ddir = "data"
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     nlay, nrow, ncol = 1, 1, 100
     nper = 1
     perlen = [5.0]
@@ -253,14 +254,7 @@ def get_model(idx, dir):
         filename="{}.gwfgwt".format(name),
     )
 
-    return sim
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim = get_model(idx, dir)
-        sim.write_simulation()
-    return
+    return sim, None
 
 
 def eval_transport(sim):
@@ -614,18 +608,19 @@ def eval_transport(sim):
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_transport, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_transport, idxsim=idx))
 
 
 def main():
@@ -633,10 +628,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_transport, idxsim=idx)
         test.run_mf6(sim)
 

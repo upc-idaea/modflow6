@@ -1,8 +1,8 @@
 import os
+import pytest
 import sys
 import shutil
 import subprocess
-from nose.tools import raises
 
 try:
     import flopy
@@ -118,10 +118,12 @@ def get_sim(ws, idomain, continue_flag=False, nouter=500):
         ccol = [1, ncol - 1]
         for j in ccol:
             c6.append([(0, nrow - 1, j), strt])
-        c6 = [[0, 0, 0, 1.], [0, nrow - 1, ncol - 1, 0.]]
+        c6 = [[0, 0, 0, 1.0], [0, nrow - 1, ncol - 1, 0.0]]
         cd6 = {0: c6}
         maxchd = len(cd6[0])
-        chd = flopy.mf6.ModflowGwfchd(gwf, stress_period_data=cd6, maxbound=maxchd)
+        chd = flopy.mf6.ModflowGwfchd(
+            gwf, stress_period_data=cd6, maxbound=maxchd
+        )
 
     # output control
     oc = flopy.mf6.ModflowGwfoc(
@@ -138,7 +140,7 @@ def get_sim(ws, idomain, continue_flag=False, nouter=500):
     return sim
 
 
-def test_normal_termination():
+def normal_termination():
     # get the simulation
     sim = get_sim(ws, idomain=1)
 
@@ -149,14 +151,16 @@ def test_normal_termination():
     returncode, buff = run_mf6([mf6_exe], ws)
     msg = "could not run {}".format(sim.name)
     if returncode != 0:
-        msg = ("The run should have been successful but it terminated "
-               "with non-zero returncode")
+        msg = (
+            "The run should have been successful but it terminated "
+            "with non-zero returncode"
+        )
         raise ValueError(msg)
 
     return
 
 
-def test_converge_fail_continue():
+def converge_fail_continue():
     # get the simulation
     sim = get_sim(ws, idomain=1, continue_flag=True, nouter=1)
 
@@ -165,77 +169,63 @@ def test_converge_fail_continue():
 
     # run the simulation
     returncode, buff = run_mf6([mf6_exe], ws)
-    msg = ("The run should have been successful even though it failed, because"
-           " the continue flag was set.  But a non-zero error code was "
-           "found: {}".format(returncode))
+    msg = (
+        "The run should have been successful even though it failed, because"
+        " the continue flag was set.  But a non-zero error code was "
+        "found: {}".format(returncode)
+    )
     assert returncode == 0, msg
     return
 
 
-@raises(RuntimeError)
 def converge_fail_nocontinue():
-    # get the simulation
-    sim = get_sim(ws, idomain=1, continue_flag=False, nouter=1)
+    with pytest.raises(RuntimeError):
+        # get the simulation
+        sim = get_sim(ws, idomain=1, continue_flag=False, nouter=1)
 
-    # write the input files
-    sim.write_simulation()
+        # write the input files
+        sim.write_simulation()
 
-    # run the simulation
-    returncode, buff = run_mf6([mf6_exe], ws)
-    msg = "This run should fail with a returncode of 1"
-    if returncode == 1:
-        raise RuntimeError(msg)
+        # run the simulation
+        returncode, buff = run_mf6([mf6_exe], ws)
+        msg = "This run should fail with a returncode of 1"
+        if returncode == 1:
+            raise RuntimeError(msg)
 
-    return
 
-@raises(RuntimeError)
 def idomain_runtime_error():
-    # get the simulation
-    sim = get_sim(ws, idomain=0)
+    with pytest.raises(RuntimeError):
+        # get the simulation
+        sim = get_sim(ws, idomain=0)
 
-    # write the input files
-    sim.write_simulation()
+        # write the input files
+        sim.write_simulation()
 
-    # run the simulation
-    returncode, buff = run_mf6([mf6_exe], ws)
-    msg = "could not run {}".format(sim.name)
-    if returncode != 0:
-        err_str = "IDOMAIN ARRAY HAS SOME VALUES GREATER THAN ZERO"
-        err = any(err_str in s for s in buff)
-        if err:
-            raise RuntimeError(msg)
-        else:
-            msg += " but IDOMAIN ARRAY ERROR not returned"
-            raise ValueError(msg)
-    return
-
-
-def test_converge_fail_nocontinue():
-    # run the test models
-    yield converge_fail_nocontinue
-
-    return
+        # run the simulation
+        returncode, buff = run_mf6([mf6_exe], ws)
+        msg = "could not run {}".format(sim.name)
+        if returncode != 0:
+            err_str = "IDOMAIN ARRAY HAS SOME VALUES GREATER THAN ZERO"
+            err = any(err_str in s for s in buff)
+            if err:
+                raise RuntimeError(msg)
+            else:
+                msg += " but IDOMAIN ARRAY ERROR not returned"
+                raise ValueError(msg)
 
 
-def test_mf6_idomain_error():
-    # run the test models
-    yield idomain_runtime_error
-
-    return
-
-
-@raises(RuntimeError)
-def test_unknown_keyword_error():
-    returncode, buff = run_mf6([mf6_exe, "--unknown_keyword"], ws)
-    msg = "could not run {}".format("unknown_keyword")
-    if returncode != 0:
-        err_str = "{}: illegal option".format(app)
-        err = any(err_str in s for s in buff)
-        if err:
-            raise RuntimeError(msg)
-        else:
-            msg += " but {} not returned".format(err_str)
-            raise ValueError(msg)
+def unknown_keyword_error():
+    with pytest.raises(RuntimeError):
+        returncode, buff = run_mf6([mf6_exe, "--unknown_keyword"], ws)
+        msg = "could not run {}".format("unknown_keyword")
+        if returncode != 0:
+            err_str = "{}: illegal option".format(app)
+            err = any(err_str in s for s in buff)
+            if err:
+                raise RuntimeError(msg)
+            else:
+                msg += " but {} not returned".format(err_str)
+                raise ValueError(msg)
 
 
 def run_argv(arg, return_str):
@@ -250,44 +240,51 @@ def run_argv(arg, return_str):
         raise RuntimeError(msg)
 
 
-def test_help_argv():
-    argv = ["-h", "--help", "-?"]
-    return_str = "{} [options]     retrieve program information".format(app)
-    for arg in argv:
-        yield run_argv, arg, return_str
+def help_argv():
+    for arg in ["-h", "--help", "-?"]:
+        return_str = "{} [options]     retrieve program information".format(
+            app
+        )
+        run_argv(arg, return_str)
 
 
-def test_version_argv():
-    argv = ["-v", "--version"]
-    return_str = "{}: 6".format(app)
-    for arg in argv:
-        yield run_argv, arg, return_str
+def version_argv():
+    for arg in ["-v", "--version"]:
+        return_str = "{}: 6".format(app)
+        run_argv(arg, return_str)
 
 
-def test_develop_argv():
-    argv = ["-dev", "--develop"]
-    return_str = "{}: develop version".format(app)
-    for arg in argv:
-        yield run_argv, arg, return_str
+def develop_argv():
+    for arg in ["-dev", "--develop"]:
+        return_str = "{}: develop version".format(app)
+        run_argv(arg, return_str)
 
 
-def test_compiler_argv():
-    argv = ["-c", "--compiler"]
-    return_str = "{}: MODFLOW 6 compiled".format(app)
-    for arg in argv:
-        yield run_argv, arg, return_str
+def compiler_argv():
+    for arg in ["-c", "--compiler"]:
+        return_str = "{}: MODFLOW 6 compiled".format(app)
+        run_argv(arg, return_str)
 
 
-def test_clean_sim():
+def clean_sim():
     print("Cleaning up")
     shutil.rmtree(ws)
+
+
+def test_main():
+    idomain_runtime_error()
+    unknown_keyword_error()
+    normal_termination()
+    converge_fail_nocontinue()
+    help_argv()
+    version_argv()
+    develop_argv()
+    compiler_argv()
+    clean_sim()
 
 
 if __name__ == "__main__":
     # print message
     print("standalone run of {}".format(os.path.basename(__file__)))
 
-    idomain_runtime_error()
-    test_unknown_keyword_error()
-    test_normal_termination()
-    converge_fail_nocontinue()
+    test_main()

@@ -1,4 +1,5 @@
 import os
+import pytest
 import numpy as np
 
 try:
@@ -25,7 +26,7 @@ continuous_integration = [True for idx in range(len(exdirs))]
 replace_exe = None
 
 
-def build_model(ws, name, timeseries=False):
+def get_model(ws, name, timeseries=False):
     # static model data
     # temporal discretization
     nper = 1
@@ -527,16 +528,16 @@ def build_model(ws, name, timeseries=False):
     return sim
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     name = ex[idx]
 
     # build MODFLOW 6 files
     ws = dir
-    sim = build_model(ws, name)
+    sim = get_model(ws, name)
 
     # build MODFLOW 6 files with timeseries
     ws = os.path.join(dir, "mf6")
-    mc = build_model(ws, name, timeseries=True)
+    mc = get_model(ws, name, timeseries=True)
 
     return sim, mc
 
@@ -548,7 +549,7 @@ def eval_model(sim):
     # get ia/ja from binary grid file
     fname = "{}.dis.grb".format(os.path.basename(sim.name))
     fpth = os.path.join(sim.simpath, fname)
-    grbobj = flopy.utils.MfGrdFile(fpth)
+    grbobj = flopy.mf6.utils.MfGrdFile(fpth)
     ia = grbobj._datadict["IA"] - 1
 
     fname = "{}.cbc".format(os.path.basename(sim.name))
@@ -611,27 +612,21 @@ def eval_model(sim):
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_simulation()
-    return
 
 
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
-    # build the models
-    build_models()
+    # build the model
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_model, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_model, idxsim=idx))
 
 
 def main():
@@ -639,10 +634,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_model, idxsim=idx)
         test.run_mf6(sim)
     return

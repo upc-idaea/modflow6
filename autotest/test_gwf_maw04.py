@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import numpy as np
 
@@ -114,7 +115,7 @@ for idx in range(nper):
 hclose, rclose = 1e-9, 1e-6
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
     name = ex[idx]
     ws = dir
 
@@ -255,16 +256,11 @@ def get_model(idx, dir):
 
 
 # - No need to change any code below
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim, mc = get_model(idx, dir)
-        sim.write_simulation()
-        if mc is not None:
-            mc.write_input()
-    return
-
-
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # determine if running on Travis or GitHub actions
     is_CI = running_on_CI()
 
@@ -272,17 +268,12 @@ def test_mf6model():
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models_legacy(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        if is_CI and not continuous_integration[idx]:
-            continue
-        yield test.run_mf6, Simulation(
-            dir, require_failure=require_failure[idx]
-        )
-
-    return
+    # run the test model
+    if is_CI and not continuous_integration[idx]:
+        return
+    test.run_mf6(Simulation(dir, require_failure=require_failure[idx]))
 
 
 def main():
@@ -290,10 +281,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models_legacy(build_model, idx, dir)
         sim = Simulation(dir, require_failure=require_failure[idx])
         test.run_mf6(sim)
 

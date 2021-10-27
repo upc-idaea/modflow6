@@ -1,4 +1,5 @@
 import os
+import pytest
 import sys
 import numpy as np
 
@@ -19,7 +20,7 @@ for s in ex:
     exdirs.append(os.path.join("temp", s))
 
 
-def get_model(idx, dir):
+def build_model(idx, dir):
 
     lx = 2.0
     lz = 1.0
@@ -243,14 +244,7 @@ def get_model(idx, dir):
     # set all the arrays to be open/close
     sim.set_all_data_external()
 
-    return sim
-
-
-def build_models():
-    for idx, dir in enumerate(exdirs):
-        sim = get_model(idx, dir)
-        sim.write_simulation()
-    return
+    return sim, None
 
 
 def eval_transport(sim):
@@ -314,18 +308,19 @@ def eval_transport(sim):
 
 
 # - No need to change any code below
-def test_mf6model():
+@pytest.mark.parametrize(
+    "idx, dir",
+    list(enumerate(exdirs)),
+)
+def test_mf6model(idx, dir):
     # initialize testing framework
     test = testing_framework()
 
     # build the models
-    build_models()
+    test.build_mf6_models(build_model, idx, dir)
 
-    # run the test models
-    for idx, dir in enumerate(exdirs):
-        yield test.run_mf6, Simulation(dir, exfunc=eval_transport, idxsim=idx)
-
-    return
+    # run the test model
+    test.run_mf6(Simulation(dir, exfunc=eval_transport, idxsim=idx))
 
 
 def main():
@@ -333,10 +328,9 @@ def main():
     test = testing_framework()
 
     # build the models
-    build_models()
-
-    # run the test models
+    # run the test model
     for idx, dir in enumerate(exdirs):
+        test.build_mf6_models(build_model, idx, dir)
         sim = Simulation(dir, exfunc=eval_transport, idxsim=idx)
         test.run_mf6(sim)
 
