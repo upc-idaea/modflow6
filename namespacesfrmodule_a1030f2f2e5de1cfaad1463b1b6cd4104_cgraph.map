@@ -1,0 +1,7 @@
+<map id="sfrmodule::calc_top_width_wet" name="sfrmodule::calc_top_width_wet">
+<area shape="rect" id="node1" title="Calculate wetted top width." alt="" coords="5,35,156,76"/>
+<area shape="rect" id="node2" href="$namespacegwfsfrcrosssectionutilsmodule.html#a9b3640c77e9e7692aeaf0fa8690058b6" title="Calculate the wetted top width for a reach." alt="" coords="221,5,442,47"/>
+<area shape="rect" id="node5" href="$namespacesmoothingmodule.html#a2fe24293993c45ad47ac9a124b16a6d7" title=" " alt="" coords="204,71,459,98"/>
+<area shape="rect" id="node3" href="$namespacegwfsfrcrosssectionutilsmodule.html#a75de53763056a7eee26f40e2b6a3f462" title="Calculate the wetted top widths for each line segment." alt="" coords="507,5,728,47"/>
+<area shape="rect" id="node4" href="$namespacegwfsfrcrosssectionutilsmodule.html#a37e8faa52bc7cf1544c73b24f45a3de0" title="Calculate the station values for the wetted portion of the cross&#45;section." alt="" coords="776,5,997,47"/>
+</map>

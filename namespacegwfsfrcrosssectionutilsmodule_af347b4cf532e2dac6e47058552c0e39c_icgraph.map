@@ -1,0 +1,7 @@
+<map id="gwfsfrcrosssectionutilsmodule::get_wetted_perimeters" name="gwfsfrcrosssectionutilsmodule::get_wetted_perimeters">
+<area shape="rect" id="node1" title="Calculate the wetted perimeters for each line segment." alt="" coords="547,39,768,80"/>
+<area shape="rect" id="node2" href="$namespacegwfsfrcrosssectionutilsmodule.html#af18c3ef7b41c7a45e8c45e82f11d5c6d" title="Calculate the hydraulic radius for a reach." alt="" coords="277,5,499,47"/>
+<area shape="rect" id="node4" href="$namespacegwfsfrcrosssectionutilsmodule.html#ae1e48079e6f159b70efe898b1e48a750" title="Calculate the wetted perimeter for a reach." alt="" coords="277,71,499,112"/>
+<area shape="rect" id="node3" href="$namespacesfrcrosssectionmanager.html#a991b31f9018f43aa8a9df00e6625447c" title="Validate cross&#45;section tables." alt="" coords="28,5,207,47"/>
+<area shape="rect" id="node5" href="$namespacesfrmodule.html#a98e5f0f033753a0b9c4d617f911e9628" title="Calculate wetted perimeter." alt="" coords="5,78,229,105"/>
+</map>

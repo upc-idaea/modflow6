@@ -22,7 +22,6 @@
 /* @license-end */
 </script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
-<link href="CustomDoxygen.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -33,9 +32,9 @@
   <td id="projectlogo"><img alt="Logo" src="mf6-triangular-grid.png"/></td>
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">MODFLOW 6
-   &#160;<span id="projectnumber">version6.2.2</span>
+   &#160;<span id="projectnumber">version 6.3.0</span>
    </div>
-   <div id="projectbrief">MODFLOW6CodeDocumentation</div>
+   <div id="projectbrief">MODFLOW 6 Code Documentation</div>
   </td>
  </tr>
  </tbody>
@@ -152,8 +151,17 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 <li>make_link()
 : <a class="el" href="namespacetimeseriesmanagermodule.html#a142b9ea7f0a86ff5593807cec33ae413">timeseriesmanagermodule</a>
 </li>
+<li>makeprimaryconnections()
+: <a class="el" href="namespacegridconnectionmodule.html#a6f8d76990e02788745bafdfcfbb3c56a">gridconnectionmodule</a>
+</li>
 <li>maketaslink()
 : <a class="el" href="namespacetimearrayseriesmanagermodule.html#a6ec6a50176fc83a28ba539bba8490a12">timearrayseriesmanagermodule</a>
+</li>
+<li>maskconnections()
+: <a class="el" href="namespacegridconnectionmodule.html#a62086954ecdbfb924b0464ff10ec19b8">gridconnectionmodule</a>
+</li>
+<li>maskownerconnections()
+: <a class="el" href="namespacegwfgwfconnectionmodule.html#a140be91220180e6297f2e7a5b7a0a592">gwfgwfconnectionmodule</a>
 </li>
 <li>maw_ac()
 : <a class="el" href="namespacemawmodule.html#ac5eee37b41437cf9f2e64053576605e8">mawmodule</a>
@@ -237,7 +245,7 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 : <a class="el" href="namespacemawmodule.html#a8223d4b65bb7f68e2bbece3212d2cead">mawmodule</a>
 </li>
 <li>maw_ot_bdsummary()
-: <a class="el" href="namespacemawmodule.html#ae0f3a5cce425a1c7f316eb3284d291aa">mawmodule</a>
+: <a class="el" href="namespacemawmodule.html#a2d44e7c54fb9ec408941153bde2eb9c8">mawmodule</a>
 </li>
 <li>maw_ot_dv()
 : <a class="el" href="namespacemawmodule.html#acd51757e4574eb9f57da3ecf91dee0c0">mawmodule</a>
@@ -298,6 +306,9 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 </li>
 <li>maxmemrank
 : <a class="el" href="namespaceconstantsmodule.html#a9ec08a833e9347ea3239bc60b9b129b8">constantsmodule</a>
+</li>
+<li>maxneighbors
+: <a class="el" href="namespacegridconnectionmodule.html#a25fbf468c46ccfb162fa935d3ddfc976">gridconnectionmodule</a>
 </li>
 <li>maxobstypes
 : <a class="el" href="namespaceconstantsmodule.html#a7bc1680f8ee7a7b1b5d8ad6927951da7">constantsmodule</a>
@@ -489,13 +500,13 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 : <a class="el" href="namespacegwtmstmodule.html#ab997259f35f25e6dd916f95ce36c725f">gwtmstmodule</a>
 </li>
 <li>mst_fc()
-: <a class="el" href="namespacegwtmstmodule.html#a93cd3dba5bf88f895d2cb578cd685a70">gwtmstmodule</a>
+: <a class="el" href="namespacegwtmstmodule.html#a734b8accbe6962f13ff2572ab7f32b42">gwtmstmodule</a>
 </li>
 <li>mst_fc_dcy()
-: <a class="el" href="namespacegwtmstmodule.html#afddd6479c2d27beb23c502837b6ef5c4">gwtmstmodule</a>
+: <a class="el" href="namespacegwtmstmodule.html#ab5df6f8c8ed881ab7378a8cdb61483bd">gwtmstmodule</a>
 </li>
 <li>mst_fc_dcy_srb()
-: <a class="el" href="namespacegwtmstmodule.html#a0d58dd7edd54f0a0286fa5b6f593a41a">gwtmstmodule</a>
+: <a class="el" href="namespacegwtmstmodule.html#a411dd441b93b747a04ba37f718a0a283">gwtmstmodule</a>
 </li>
 <li>mst_fc_srb()
 : <a class="el" href="namespacegwtmstmodule.html#ae85f0f1a250d1f5ad4d2e3657e2c1aac">gwtmstmodule</a>
@@ -546,7 +557,7 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 : <a class="el" href="namespacegwfmvrmodule.html#a9f9a116f78747a04f742cc38b67fe857">gwfmvrmodule</a>
 </li>
 <li>mvr_ot_bdsummary()
-: <a class="el" href="namespacegwfmvrmodule.html#aba4df200596e6a29822de968f7fb9520">gwfmvrmodule</a>
+: <a class="el" href="namespacegwfmvrmodule.html#ac95629025a701878758070f14451e32d">gwfmvrmodule</a>
 </li>
 <li>mvr_ot_printflow()
 : <a class="el" href="namespacegwfmvrmodule.html#a90471824267a6372eac6487e5aba7475">gwfmvrmodule</a>
@@ -594,7 +605,7 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 : <a class="el" href="namespacegwtmvtmodule.html#a030e8a26cdfca8eca48433eacf46f95c">gwtmvtmodule</a>
 </li>
 <li>mvt_ot_bdsummary()
-: <a class="el" href="namespacegwtmvtmodule.html#aed704b8c8d93ac22b36008a9eea1fbb0">gwtmvtmodule</a>
+: <a class="el" href="namespacegwtmvtmodule.html#abed9262dcf173a7388f17cf8f6f170b4">gwtmvtmodule</a>
 </li>
 <li>mvt_ot_printflow()
 : <a class="el" href="namespacegwtmvtmodule.html#a382a836dd6a37dfadced4a1d3c886f99">gwtmvtmodule</a>
@@ -668,7 +679,7 @@ $(document).ready(function(){initNavTree('namespacemembers_m.html',''); initResi
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="footer">Generated on Fri Jun 11 2021 22:03:15 for MODFLOW 6 by
+    <li class="footer">Generated on Wed Oct 27 2021 11:25:25 for MODFLOW 6 by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.17 </li>
   </ul>

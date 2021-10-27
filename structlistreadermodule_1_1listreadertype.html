@@ -22,7 +22,6 @@
 /* @license-end */
 </script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
-<link href="CustomDoxygen.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -33,9 +32,9 @@
   <td id="projectlogo"><img alt="Logo" src="mf6-triangular-grid.png"/></td>
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">MODFLOW 6
-   &#160;<span id="projectnumber">version6.2.2</span>
+   &#160;<span id="projectnumber">version 6.3.0</span>
    </div>
-   <div id="projectbrief">MODFLOW6CodeDocumentation</div>
+   <div id="projectbrief">MODFLOW 6 Code Documentation</div>
   </td>
  </tr>
  </tbody>
@@ -179,8 +178,8 @@ Private Attributes</h2></td></tr>
 <tr class="separator:ae43390859e11b1189aacec8847f5319c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad8b2b346ed486e88109d17a78b359aa0"><td class="memItemLeft" align="right" valign="top">character(len=lenlistlabel)&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structlistreadermodule_1_1listreadertype.html#ad8b2b346ed486e88109d17a78b359aa0">label</a> = ''</td></tr>
 <tr class="separator:ad8b2b346ed486e88109d17a78b359aa0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1630aa1b637f5165f83e5896b8579564"><td class="memItemLeft" align="right" valign="top">character(len=linelength)&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structlistreadermodule_1_1listreadertype.html#a1630aa1b637f5165f83e5896b8579564">line</a> = ''</td></tr>
-<tr class="separator:a1630aa1b637f5165f83e5896b8579564"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acc919f46b33cea21112966fa8448f0a9"><td class="memItemLeft" align="right" valign="top">character(len=:), allocatable, private&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structlistreadermodule_1_1listreadertype.html#acc919f46b33cea21112966fa8448f0a9">line</a></td></tr>
+<tr class="separator:acc919f46b33cea21112966fa8448f0a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad1727183859e05aa0ca7d86a6ca78226"><td class="memItemLeft" align="right" valign="top">integer(i4b), dimension(:), pointer, contiguous&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structlistreadermodule_1_1listreadertype.html#ad1727183859e05aa0ca7d86a6ca78226">mshape</a> =&gt; null()</td></tr>
 <tr class="separator:ad1727183859e05aa0ca7d86a6ca78226"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af1f04a4bbe995a19e53cddc9694d1a8b"><td class="memItemLeft" align="right" valign="top">integer(i4b), dimension(:), pointer, contiguous&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structlistreadermodule_1_1listreadertype.html#af1f04a4bbe995a19e53cddc9694d1a8b">nodelist</a> =&gt; null()</td></tr>
@@ -805,8 +804,8 @@ Private Attributes</h2></td></tr>
 </div><!-- fragment -->
 </div>
 </div>
-<a id="a1630aa1b637f5165f83e5896b8579564"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a1630aa1b637f5165f83e5896b8579564">&#9670;&nbsp;</a></span>line</h2>
+<a id="acc919f46b33cea21112966fa8448f0a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc919f46b33cea21112966fa8448f0a9">&#9670;&nbsp;</a></span>line</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -815,7 +814,7 @@ Private Attributes</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">character(len=linelength) listreadermodule::listreadertype::line = ''</td>
+          <td class="memname">character(len=:), allocatable, private listreadermodule::listreadertype::line</td>
         </tr>
       </table>
   </td>
@@ -826,7 +825,7 @@ Private Attributes</h2></td></tr>
 </div><div class="memdoc">
 
 <p class="definition">Definition at line <a class="el" href="_list_reader_8f90_source.html#l00028">28</a> of file <a class="el" href="_list_reader_8f90_source.html">ListReader.f90</a>.</p>
-<div class="fragment"><div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;    <span class="keywordtype">character(len=LINELENGTH)</span> :: line = <span class="stringliteral">&#39;&#39;</span>                                       <span class="comment">! line string for reading file</span></div>
+<div class="fragment"><div class="line"><a name="l00028"></a><span class="lineno">   28</span>&#160;    <span class="keywordtype">character(len=:)</span>, <span class="keywordtype">allocatable</span>, <span class="keywordtype">private</span> :: line                               <span class="comment">! current line</span></div>
 </div><!-- fragment -->
 </div>
 </div>
@@ -1089,7 +1088,7 @@ Private Attributes</h2></td></tr>
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="navelem"><a class="el" href="namespacelistreadermodule.html">listreadermodule</a></li><li class="navelem"><a class="el" href="structlistreadermodule_1_1listreadertype.html">listreadertype</a></li>
-    <li class="footer">Generated on Fri Jun 11 2021 22:03:07 for MODFLOW 6 by
+    <li class="footer">Generated on Wed Oct 27 2021 11:25:17 for MODFLOW 6 by
     <a href="http://www.doxygen.org/index.html">
     <img class="footer" src="doxygen.png" alt="doxygen"/></a> 1.8.17 </li>
   </ul>

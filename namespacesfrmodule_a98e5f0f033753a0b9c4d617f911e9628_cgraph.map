@@ -1,0 +1,6 @@
+<map id="sfrmodule::calc_perimeter_wet" name="sfrmodule::calc_perimeter_wet">
+<area shape="rect" id="node1" title="Calculate wetted perimeter." alt="" coords="5,13,229,39"/>
+<area shape="rect" id="node2" href="$namespacegwfsfrcrosssectionutilsmodule.html#ae1e48079e6f159b70efe898b1e48a750" title="Calculate the wetted perimeter for a reach." alt="" coords="277,5,499,47"/>
+<area shape="rect" id="node3" href="$namespacegwfsfrcrosssectionutilsmodule.html#af347b4cf532e2dac6e47058552c0e39c" title="Calculate the wetted perimeters for each line segment." alt="" coords="547,5,768,47"/>
+<area shape="rect" id="node4" href="$namespacegwfsfrcrosssectionutilsmodule.html#a37e8faa52bc7cf1544c73b24f45a3de0" title="Calculate the station values for the wetted portion of the cross&#45;section." alt="" coords="816,5,1037,47"/>
+</map>
