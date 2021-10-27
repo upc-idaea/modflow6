@@ -1065,6 +1065,7 @@ module GwtSsmModule
     ! -- Return
     return
   end subroutine read_sources_fileinput
+<<<<<<< HEAD
   
   !> @ brief Set iauxpak array value for package ip
   !!
@@ -1111,6 +1112,54 @@ module GwtSsmModule
     return
   end subroutine set_iauxpak
   
+=======
+  
+  !> @ brief Set iauxpak array value for package ip
+  !!
+  !!  The next call to parser will return the auxiliary name for
+  !!  package ip in the SSM SOURCES block.  The routine searches
+  !!  through the auxiliary names in package ip and sets iauxpak
+  !!  to the column number corresponding to the correct auxiliary
+  !!  column.
+  !!
+  !<
+  subroutine set_iauxpak(this, ip, packname)
+    ! -- dummy
+    class(GwtSsmtype),intent(inout) :: this  !< GwtSsmtype
+    integer(I4B), intent(in) :: ip           !< package number
+    character(len=*), intent(in) :: packname !< name of package
+    ! -- local
+    character(len=LENAUXNAME) :: auxname    
+    logical :: auxfound
+    integer(I4B) :: iaux
+    !
+    ! -- read name of auxiliary column
+    call this%parser%GetStringCaps(auxname)
+    auxfound = .false.
+    do iaux = 1, this%fmi%gwfpackages(ip)%naux
+      if (trim(this%fmi%gwfpackages(ip)%auxname(iaux)) ==                  &
+          trim(auxname)) then
+        auxfound = .true.
+        exit
+      endif
+    enddo
+    if (.not. auxfound) then
+      write(errmsg,'(1x, a, a)')                                           &
+        'AUXILIARY NAME CANNOT BE FOUND: ', trim(auxname)
+      call store_error(errmsg)
+      call this%parser%StoreErrorUnit()
+    endif
+    !
+    ! -- set iauxpak and write message
+    this%iauxpak(ip) = iaux
+    write(this%iout, '(4x, a, i0, a, a)') 'USING AUX COLUMN ',      &
+      iaux, ' IN PACKAGE ', trim(packname)
+    !
+    ! -- return
+    return
+  end subroutine set_iauxpak
+  
+>>>>>>> b42b05e479f70f54800e726e60a9cf6e6405a10e
   !> @ brief Set ssmivec array value for package ip
   !!
   !!  The next call to parser will return the input file name for
